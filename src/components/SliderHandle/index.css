@@ -1,0 +1,13 @@
+.SliderHandle {
+    position: relative;
+    width: 10vw;
+    margin-right: 10px;
+    border-left: 1px solid rgba(172, 249, 251, 1);
+}
+.SliderHandle p {
+    width: 100%;
+    height: 1px;
+    background: rgba(172, 249, 251, 1);
+    position: absolute;
+    left: 0;
+}

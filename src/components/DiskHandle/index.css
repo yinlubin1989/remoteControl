@@ -1,0 +1,16 @@
+.DiskHandle {
+    width: 30vw;
+    height: 30vw;
+    border: 1px solid rgba(172, 249, 251, 1);
+    position: relative;
+    border-radius: 50%;
+    margin-right: 10px;   
+}
+.DiskHandle .rotate {
+    width: 100%;
+    height: 1px;
+    background: rgba(172, 249, 251, 1);
+    position: absolute;
+    top: 50%;
+    left: 0;
+}

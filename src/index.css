@@ -1,0 +1,29 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+/* 
+body {
+    background: rgb(13, 14, 27);
+    overflow: hidden;
+}
+ */
+
+ body {
+    width: 100%;
+ }
+
+
+.top {
+    background: green;
+    height: 300px;
+    position: fixed;
+    width: 100%;
+    transition: 1s;
+    left: 0;
+    top: 0;
+}
+.main {
+    transition: 1s;
+}

@@ -1,0 +1,19 @@
+.CrossHandle {
+    width: 30vw;
+    height: 30vw;
+    border: 1px solid rgba(172, 249, 251, 1);
+    position: relative;
+    border-radius: 2px;
+    margin-right: 10px;
+}
+.CrossHandle p {
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    margin-top: -4px;
+    border: 1px solid #acf9fb;
+    border-radius: 50%;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+}
