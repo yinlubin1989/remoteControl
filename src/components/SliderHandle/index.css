@@ -2,7 +2,7 @@
     position: relative;
     width: 10vw;
     margin-right: 10px;
-    border-left: 1px solid rgba(172, 249, 251, 1);
+    border-left: 1px dashed rgba(172, 249, 251, 0.2);
 }
 .SliderHandle p {
     width: 100%;

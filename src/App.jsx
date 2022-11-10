@@ -48,6 +48,7 @@ function App() {
         <SliderHandle onChange={e => armChange(e, 1, 2)}/>
         <CrossHandle onChange={e => armChange(e, 1, 2)}/>
         <DiskHandle onChange={e => armChange(e, 1, 2)}/>
+        <SliderHandle onChange={e => armChange(e, 1, 2)}/>
         {/* <CrossHandle onChange={e => armChange(e, 3, 4)}/> */}
       </div>
     </div>
