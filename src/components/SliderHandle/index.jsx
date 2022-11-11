@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import './index.css'
 
 const Main = ({
-  onChange
+  onChange, width = '10vw', defalutValue = 50, title
 }) => {
-  const [armY, setArmY] = useState(50);
+  const [armY, setArmY] = useState(defalutValue);
 
   const lastArmYPoint = useRef();
 
@@ -22,7 +22,8 @@ const Main = ({
   const onTouchMove = (event) => {
     const { clientWidth } = document.body
     const { clientY } = event.targetTouches[0]
-    const yIncrease = clientY - lastArmYPoint.current
+    const yIncrease = lastArmYPoint.current - clientY
+    console.log(yIncrease);
     const updateArmY = armY + (yIncrease / clientWidth * 100)
     setArmY(limitBoundary(updateArmY))
     lastArmYPoint.current = clientY
@@ -36,8 +37,14 @@ const Main = ({
     <div className="SliderHandle"
       onTouchMove={onTouchMove}
       onTouchStart={onTouchStart}
+      style={{
+        width
+      }}
     >
-      <p style={{ top: `${armY}%` }}></p>
+      <span className='title'>{title}</span>
+      <p style={{ bottom: `${armY}%` }}>
+        <span>{Math.floor(JSON.stringify(armY))}</span>
+      </p>
     </div>
   )
 }

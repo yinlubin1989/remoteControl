@@ -16,6 +16,27 @@
     border: 1px solid #acf9fb;
     position: absolute;
 }
-.arm {
+.Console {
     display: flex;
+    padding: 12px;
+    justify-content: space-between;
+}
+.Arm {
+    display: flex;
+    padding: 10px;
+}
+.Start {
+    width: 20vw;
+    height: 50px;
+    line-height: 50px;
+    font-size: 10px;
+    display: block;
+    border-radius: 2px;
+    border: 1px solid rgba(172, 249, 251, 1);
+    margin-top: 0px;
+    text-align: center;
+    margin-top: 16px;
+}
+.Right {
+    position: relative;
 }

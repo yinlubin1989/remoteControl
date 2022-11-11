@@ -1,0 +1,24 @@
+.Direction {
+    width: 50vw;
+    height: 50px;
+    overflow: hidden;
+    display: flex;
+    border: 1px solid rgba(172, 249, 251, 1);
+    border-left: 0;
+    border-right: 0;
+    position: absolute;
+    bottom: 1px;
+    right: 20px;
+    border-radius: 6px;
+}
+.Direction p {
+    width: 10px;
+    height: 10px;
+    margin-left: -5px;
+    margin-top: -5px;
+    position: absolute;
+    border: 1px solid rgba(172, 249, 251, 1);
+    left: 50%;
+    top: 50%;
+    border-radius: 50%;
+}

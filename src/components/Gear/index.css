@@ -1,0 +1,21 @@
+.Gear {
+    position: absolute;
+    width: 15vw;
+    height: 100px;
+    text-align: center;
+    list-style: none;
+    font-size: 12px;
+    font-style: italic;
+    right: 5px;
+    top: 0;
+}
+.Gear li {
+    height: 20px;
+    line-height: 20px;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+}
+.Gear li.active {
+    border-radius: 2px;
+    border: 1px solid rgba(172, 249, 251, 1);
+}

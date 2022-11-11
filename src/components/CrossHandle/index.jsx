@@ -4,16 +4,16 @@ import './index.css'
 const Main = ({
   onChange
 }) => {
-  const [armX, setArmX] = useState(50);
-  const [armY, setArmY] = useState(50);
+  const [armX, setArmX] = useState(50)
+  const [armY, setArmY] = useState(50)
 
-  const lastArmXPoint = useRef();
-  const lastArmYPoint = useRef();
+  const lastArmXPoint = useRef()
+  const lastArmYPoint = useRef()
 
   const onTouchStart = (event) => {
     const { clientX, clientY } = event.targetTouches[0]
-    lastArmXPoint.current = clientX;
-    lastArmYPoint.current = clientY;
+    lastArmXPoint.current = clientX
+    lastArmYPoint.current = clientY
   }
 
   const limitBoundary = (position) => {
