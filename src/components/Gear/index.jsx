@@ -6,7 +6,7 @@ const Main = ({
 }) => {
   const startPoint = useRef()
   const endPoint = useRef()
-  const [gearIndex, setGearIndex] = useState(0)
+  const [gearIndex, setGearIndex] = useState(2)
   const gears = ['N', 'R', 'D']
   const onTouchStart = (e) => {
     const { clientY } = e.targetTouches[0]

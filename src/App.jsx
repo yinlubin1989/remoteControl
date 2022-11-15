@@ -40,6 +40,8 @@ function App() {
   useEffect(() => {
     videoZero()
     initKeyBoard()
+    // 好盈1060这个电调需要初始化归零值...
+    pwmChange(50)
     return () => {
       document.getElementById('screen').innerHTML = ''
     }
