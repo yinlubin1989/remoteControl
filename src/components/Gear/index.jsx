@@ -25,8 +25,12 @@ const Main = ({
       direction = 0
     }
     setGearIndex(gearIndex + direction)
-    
   }
+
+  useEffect(() => {
+    onChange(gears[gearIndex])
+  }, [gearIndex])
+
   return (
     <ul className="Gear"
       onTouchStart={onTouchStart}

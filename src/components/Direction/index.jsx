@@ -25,7 +25,10 @@ const Main = ({
   }
   const onTouchEnd = () => {
     setArmX(50)
-  }  
+  }
+  useEffect(() => {
+    onChange(armX)
+  }, [armX])
   return (
     <div className="Direction"
       onTouchStart={onTouchStart}
