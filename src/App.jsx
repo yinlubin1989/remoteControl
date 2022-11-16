@@ -46,6 +46,16 @@ function App() {
     initKeyBoard()
     // 好盈1060这个电调需要初始化归零值...
     pwmChange(15, 50)
+
+    window.addEventListener('gamepadconnected', function(e) {
+
+      console.log('控制器输出', e)
+      console.log("控制器已连接于 %d 位：%s. %d 个按钮，%d 个坐标方向。",
+        e.gamepad.index, e.gamepad.id,
+        e.gamepad.buttons.length, e.gamepad.axes.length)
+
+    })
+
     return () => {
       document.getElementById('screen').innerHTML = ''
     }
