@@ -13,10 +13,14 @@ const socket = io('http://39.106.81.156:5005')
 window.socket = socket
 
 socket.on("connect", () => {
+  socket.emit('setPulseLength', {
+    pin: 15,
+    data: 1500
+  })
   socket.emit('hb')
   setInterval(() => {
     socket.emit('hb')
-  }, 200)
+  }, 100)
 })
 
 function App() {
@@ -41,7 +45,7 @@ function App() {
     videoZero()
     initKeyBoard()
     // 好盈1060这个电调需要初始化归零值...
-    pwmChange(50)
+    pwmChange(15, 50)
     return () => {
       document.getElementById('screen').innerHTML = ''
     }
@@ -91,13 +95,13 @@ function App() {
     if (gearValue.current === 'N') return
 
     socket.emit('setPulseLength', {
-      pin: 1,
+      pin: 15,
       data: pwm
     })
   }
 
   const onTouchEndThrottle = () => {
-    socket.emit('channelOff', { pin: 1 })
+    socket.emit('channelOff', { pin: 15 })
   }
 
   const gearChange = (gear) => {
@@ -106,7 +110,7 @@ function App() {
 
   const onTouchBrake = () => {
     socket.emit('setPulseLength', {
-      pin: 1,
+      pin: 15,
       data: 1500
     })
   }

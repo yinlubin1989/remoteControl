@@ -17,9 +17,9 @@
     border: 1px solid #acf9fb;
     position: absolute;
 }
-.App {
+/* .App {
     opacity: 0.1;
-}
+} */
 .Console {
     display: flex;
     padding: 0;
