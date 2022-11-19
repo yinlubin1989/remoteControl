@@ -20,12 +20,14 @@ socket.on("connect", () => {
   socket.emit('hb')
   setInterval(() => {
     socket.emit('hb')
-  }, 100)
+  }, 500)
 })
 
 function App() {
   const refSpeed = useRef()
   const gearValue = useRef()
+  const [lgWheel, setLgWheel] = useState(50)
+  const [lgThrottle, setLgThrottle] = useState(0)
   const videoZero = () => {
     window.wsavc = new WSAvcPlayer({ useWorker: false })
     document.getElementById('screen').appendChild(window.wsavc.AvcPlayer.canvas)
@@ -41,20 +43,56 @@ function App() {
     }
   }
 
+  const lgInit = () => {
+    // window.addEventListener('gamepadconnected', function(e) {
+    //   navigator.getGamepads().forEach((item) => {
+    //     if (item?.id?.includes?.('G29')) {
+    //       gamePad.current = item
+    //     }
+    //   })
+    // })
+    setInterval(() => {
+      const [gamePads] = navigator.getGamepads()
+
+      if (!gamePads) return
+      const [lgWheel, ,lgThrottle] = gamePads.axes
+      const lgWheelValue = Math.round(lgWheel * 100)  / 2 + 50
+      const lgThrottleValue = Math.round(lgThrottle * 100)  / 2 + 50
+      setLgWheel(100 - lgWheelValue)
+      setLgThrottle(100 - lgThrottleValue)
+      const [,,,,addGear] = gamePads.buttons
+      console.log(addGear)
+    }, 100)
+  }
+
+  useEffect(() => {
+    pwmChange(15, lgWheel)
+  }, [lgWheel])
+
+  useEffect(() => {
+    let pwm = 1500
+    if (gearValue.current === 'D') {
+      pwm = pwm - (lgThrottle * 5)
+    }
+    if (gearValue.current === 'R') {
+      pwm = pwm + (lgThrottle * 5)
+    }
+    if (gearValue.current === 'N') return
+
+    console.log(pwm)
+    socket.emit('setPulseLength', {
+      pin: 0,
+      data: pwm
+    })
+  }, [lgThrottle])
+
   useEffect(() => {
     videoZero()
     initKeyBoard()
     // 好盈1060这个电调需要初始化归零值...
     pwmChange(15, 50)
 
-    window.addEventListener('gamepadconnected', function(e) {
-
-      console.log('控制器输出', e)
-      console.log("控制器已连接于 %d 位：%s. %d 个按钮，%d 个坐标方向。",
-        e.gamepad.index, e.gamepad.id,
-        e.gamepad.buttons.length, e.gamepad.axes.length)
-
-    })
+    lgInit()
 
     return () => {
       document.getElementById('screen').innerHTML = ''
@@ -67,10 +105,10 @@ function App() {
         onTouchThrottle()
       }
       if (e.key === 'ArrowLeft') {
-        pwmChange(0, 100)
+        pwmChange(15, 100)
       }
       if (e.key === 'ArrowRight') {
-        pwmChange(0, 0)
+        pwmChange(15, 0)
       }
     })
     window.addEventListener('keyup', (e) => {
@@ -78,7 +116,7 @@ function App() {
         onTouchEndThrottle()
       }
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        pwmChange(0, 50)
+        pwmChange(15, 50)
       }
     })
   }
@@ -103,7 +141,6 @@ function App() {
       pwm = pwm + (refSpeed.current * 5)
     }
     if (gearValue.current === 'N') return
-
     socket.emit('setPulseLength', {
       pin: 15,
       data: pwm
@@ -145,7 +182,7 @@ function App() {
           onTouchEnd={onTouchEndThrottle}
         >stop</a>
         <Gear onChange={gearChange}/>
-        <Direction onChange={e => pwmChange(0, 100 - e)}/>
+        <Direction onChange={e => pwmChange(15, 100 - e)}/>
       </div>
       <br />
       {/* <div className="Arm">
