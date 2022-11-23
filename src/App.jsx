@@ -17,10 +17,10 @@ socket.on("connect", () => {
   //   pin: 15,
   //   data: 1500
   // })
-  socket.emit('hb')
-  setInterval(() => {
-    socket.emit('hb')
-  }, 500)
+  // socket.emit('hb')
+  // setInterval(() => {
+  //   socket.emit('hb')
+  // }, 500)
 })
 
 function App() {
@@ -28,6 +28,9 @@ function App() {
   const gearValue = useRef()
   const [lgWheel, setLgWheel] = useState(50)
   const [lgThrottle, setLgThrottle] = useState(0)
+  const [lgGear, setLgGear] = useState('D')
+  const [cam, setCam] = useState(50)
+  
   const videoZero = () => {
     window.wsavc = new WSAvcPlayer({ useWorker: false })
     document.getElementById('screen').appendChild(window.wsavc.AvcPlayer.canvas)
@@ -55,18 +58,40 @@ function App() {
       const [gamePads] = navigator.getGamepads()
 
       if (!gamePads) return
-      const [lgWheel, ,lgThrottle] = gamePads.axes
+      const [lgWheel, , , , ,lgThrottle] = gamePads.axes
       const lgWheelValue = Math.round(lgWheel * 100)  / 2 + 50
       const lgThrottleValue = Math.round(lgThrottle * 100)  / 2 + 50
       setLgWheel(100 - lgWheelValue)
       setLgThrottle(100 - lgThrottleValue)
-      const [,,,,addGear] = gamePads.buttons
-      console.log(addGear)
-    }, 100)
+      if (gamePads.buttons[0].touched) {
+        setLgGear('R')
+      } else if (gamePads.buttons[1].touched) {
+        setLgGear('D')
+      }
+      if (gamePads.buttons[8].touched) {
+        setCam(0)
+      } else if (gamePads.buttons[9].touched) {
+        setCam(100)
+      } else {
+        setCam(50)
+      }
+    }, 20)
   }
 
+  useEffect(() => { 
+    gearValue.current = lgGear
+  }, [lgGear])
+
   useEffect(() => {
-    pwmChange(15, lgWheel)
+    pwmChange(13, cam)
+    console.log(cam)
+  }, [cam])
+
+  useEffect(() => {
+    socket.emit('setPulseLength', {
+      pin: 14,
+      data: lgWheel * 19 + 610
+    })
   }, [lgWheel])
 
   useEffect(() => {
@@ -79,9 +104,8 @@ function App() {
     }
     if (gearValue.current === 'N') return
 
-    console.log(pwm)
     socket.emit('setPulseLength', {
-      pin: 0,
+      pin: 15,
       data: pwm
     })
   }, [lgThrottle])
@@ -105,10 +129,10 @@ function App() {
         onTouchThrottle()
       }
       if (e.key === 'ArrowLeft') {
-        pwmChange(15, 100)
+        pwmChange(14, 90)
       }
       if (e.key === 'ArrowRight') {
-        pwmChange(15, 0)
+        pwmChange(14, 10)
       }
     })
     window.addEventListener('keyup', (e) => {
@@ -116,7 +140,7 @@ function App() {
         onTouchEndThrottle()
       }
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        pwmChange(15, 50)
+        pwmChange(14, 50)
       }
     })
   }
@@ -182,7 +206,7 @@ function App() {
           onTouchEnd={onTouchEndThrottle}
         >stop</a>
         <Gear onChange={gearChange}/>
-        <Direction onChange={e => pwmChange(15, 100 - e)}/>
+        <Direction onChange={e => pwmChange(14, 100 - e)}/>
       </div>
       <br />
       {/* <div className="Arm">
