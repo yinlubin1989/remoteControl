@@ -55,7 +55,7 @@ function App() {
     //   })
     // })
     setInterval(() => {
-      const [gamePads] = navigator.getGamepads()
+      const gamePads = navigator.getGamepads().find(item => item.id.includes('B696'))
 
       if (!gamePads) return
       const [lgWheel, , , , ,lgThrottle] = gamePads.axes
