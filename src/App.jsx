@@ -13,10 +13,10 @@ const socket = io('http://39.106.81.156:5005')
 window.socket = socket
 
 socket.on("connect", () => {
-  // socket.emit('setPulseLength', {
-  //   pin: 15,
-  //   data: 1500
-  // })
+  socket.emit('setPulseLength', {
+    pin: 15,
+    data: 1500
+  })
   // socket.emit('hb')
   // setInterval(() => {
   //   socket.emit('hb')
