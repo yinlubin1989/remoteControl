@@ -1,7 +1,7 @@
 #screen {
     width: 100%;
     position: relative;
-    transform: rotate(180deg);
+    /* transform: rotate(180deg); */
 }
 #screen canvas {
     width: 100%;
@@ -27,6 +27,7 @@
     height: 180px;
     justify-content: space-between;
     position: relative;
+    margin: 20px 0 0 0;
 }
 .Arm {
     display: flex;

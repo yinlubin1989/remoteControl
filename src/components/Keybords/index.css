@@ -1,0 +1,20 @@
+.Keyboards {
+    padding: 2vw;
+    overflow: hidden;
+}
+.Keyboards a{
+    width: 10vw;
+    height: 20px;
+    line-height: 20px;
+    font-size: 10px;
+    display: block;
+    border-radius: 2px;
+    border: 1px solid rgba(172, 249, 251, 1);
+    margin-top: 0px;
+    text-align: center;
+    display: inline-block;
+    margin-right: 2vw;
+}
+.Keyboards a.off {
+    text-decoration: line-through;
+}

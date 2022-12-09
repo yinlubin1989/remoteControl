@@ -4,6 +4,7 @@ import io from 'socket.io-client'
 import CrossHandle from './components/CrossHandle'
 import SliderHandle from './components/SliderHandle'
 import DiskHandle from './components/DiskHandle'
+import Keybords from './components/Keybords'
 import Gear from './components/Gear'
 import Direction from './components/Direction'
 
@@ -17,11 +18,23 @@ socket.on("connect", () => {
     pin: 15,
     data: 1500
   })
-  // socket.emit('hb')
-  // setInterval(() => {
-  //   socket.emit('hb')
-  // }, 500)
+  setTimeout(() => {
+    [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].forEach((pin) => {
+      socket.emit('channelOff', { pin })
+    })
+  }, 500)
+  socket.emit('hb')
+  setInterval(() => {
+    socket.emit('hb')
+  }, 500)
 })
+
+// window.onbeforeunload = function(e){
+//   [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].forEach((pin) => {
+//     socket.emit('channelOff', { pin })
+//   })
+//   e.returnValue=("确定离开当前页面吗？");
+// }
 
 function App() {
   const refSpeed = useRef()
@@ -31,12 +44,12 @@ function App() {
   const [lgGear, setLgGear] = useState('D')
   const [cam, setCam] = useState(50)
   
-  const videoZero = () => {
+  const videoZero = (mode = 3) => {
     window.wsavc = new WSAvcPlayer({ useWorker: false })
     document.getElementById('screen').appendChild(window.wsavc.AvcPlayer.canvas)
     window.wsavc.connect("ws://39.106.81.156:5001/video")
     window.wsavc.ws.onopen = () => {
-      window.wsavc.send({ mode: 3 })
+      window.wsavc.send({ mode })
     }
     window.wsavc.ws.addEventListener('message', () => {
       // console.log('ok')
@@ -54,28 +67,28 @@ function App() {
     //     }
     //   })
     // })
-    setInterval(() => {
-      const gamePads = navigator.getGamepads().find(item => item.id.includes('B696'))
+    // setInterval(() => {
+    //   const gamePads = navigator.getGamepads().find(item => item?.id?.includes?.('B696'))
 
-      if (!gamePads) return
-      const [lgWheel, , , , ,lgThrottle] = gamePads.axes
-      const lgWheelValue = Math.round(lgWheel * 100)  / 2 + 50
-      const lgThrottleValue = Math.round(lgThrottle * 100)  / 2 + 50
-      setLgWheel(100 - lgWheelValue)
-      setLgThrottle(100 - lgThrottleValue)
-      if (gamePads.buttons[0].touched) {
-        setLgGear('R')
-      } else if (gamePads.buttons[1].touched) {
-        setLgGear('D')
-      }
-      if (gamePads.buttons[8].touched) {
-        setCam(0)
-      } else if (gamePads.buttons[9].touched) {
-        setCam(100)
-      } else {
-        setCam(50)
-      }
-    }, 20)
+    //   if (!gamePads) return
+    //   const [lgWheel, , , , ,lgThrottle] = gamePads.axes
+    //   const lgWheelValue = Math.round(lgWheel * 100)  / 2 + 50
+    //   const lgThrottleValue = Math.round(lgThrottle * 100)  / 2 + 50
+    //   setLgWheel(100 - lgWheelValue)
+    //   setLgThrottle(100 - lgThrottleValue)
+    //   if (gamePads.buttons[0].touched) {
+    //     setLgGear('R')
+    //   } else if (gamePads.buttons[1].touched) {
+    //     setLgGear('D')
+    //   }
+    //   if (gamePads.buttons[8].touched) {
+    //     setCam(0)
+    //   } else if (gamePads.buttons[9].touched) {
+    //     setCam(100)
+    //   } else {
+    //     setCam(50)
+    //   }
+    // }, 20)
   }
 
   useEffect(() => { 
@@ -83,16 +96,15 @@ function App() {
   }, [lgGear])
 
   useEffect(() => {
-    pwmChange(13, cam)
-    console.log(cam)
+    pwmChange(2, cam)
   }, [cam])
 
-  useEffect(() => {
-    socket.emit('setPulseLength', {
-      pin: 14,
-      data: lgWheel * 19 + 610
-    })
-  }, [lgWheel])
+  // useEffect(() => {
+  //   socket.emit('setPulseLength', {
+  //     pin: 1,
+  //     data: lgWheel * 19 + 610
+  //   })
+  // }, [lgWheel])
 
   useEffect(() => {
     let pwm = 1500
@@ -105,7 +117,7 @@ function App() {
     if (gearValue.current === 'N') return
 
     socket.emit('setPulseLength', {
-      pin: 15,
+      pin: 0,
       data: pwm
     })
   }, [lgThrottle])
@@ -186,9 +198,14 @@ function App() {
     })
   }
 
+  const videoChange = () => {
+    videoZero(2)
+  }
+
   return (
     <div className="App">
       <div id="screen" />
+      <Keybords socket={socket} videoChange={videoChange}/>
       <div className="Console">
         <SliderHandle
           onChange={speedChange}
@@ -209,12 +226,14 @@ function App() {
         <Direction onChange={e => pwmChange(14, 100 - e)}/>
       </div>
       <br />
-      {/* <div className="Arm">
-        <SliderHandle onChange={e => {}}/>
-        <CrossHandle onChange={e => armChange(e, 1, 2)}/>
-        <DiskHandle onChange={e => armChange(e, 1, 2)}/>
-        <SliderHandle onChange={e => {}}/>
-      </div> */}
+      <div className="Arm">
+        {/* <SliderHandle onChange={e => {}}/> */}
+        <CrossHandle onChange={e => {
+          pwmChange(13, e.armX)
+        }}/>
+        {/* <DiskHandle onChange={e => armChange(e, 1, 2)}/>
+        <SliderHandle onChange={e => {}}/> */}
+      </div>
     </div>
   )
 }
