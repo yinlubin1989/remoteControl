@@ -39,6 +39,7 @@ socket.on("connect", () => {
 function App() {
   const refSpeed = useRef()
   const gearValue = useRef()
+  const [pannel, setPannel] = useState('')
   const [lgWheel, setLgWheel] = useState(50)
   const [lgThrottle, setLgThrottle] = useState(0)
   const [lgGear, setLgGear] = useState('D')
@@ -202,10 +203,18 @@ function App() {
     videoZero(2)
   }
 
+  useEffect(() => {
+    setInterval(() => {
+      
+      setPannel(navigator.getGamepads()[0].axes)
+    }, 10)
+  }, [])
+  
   return (
     <div className="App">
       <div id="screen" />
       <Keybords socket={socket} videoChange={videoChange}/>
+      {JSON.stringify(pannel)}
       <div className="Console">
         <SliderHandle
           onChange={speedChange}
