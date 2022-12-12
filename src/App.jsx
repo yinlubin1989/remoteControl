@@ -42,10 +42,15 @@ function App() {
   const [pannel, setPannel] = useState('')
   const [lgWheel, setLgWheel] = useState(50)
   const [lgThrottle, setLgThrottle] = useState(0)
+  const [isLimit, setIsLimit] = useState(false)
   const [lgGear, setLgGear] = useState('D')
   const [cam, setCam] = useState(50)
   
   const videoZero = (mode = 3) => {
+    if (window.wsavc) {
+      window.wsavc.send({ mode })
+      return
+    }
     window.wsavc = new WSAvcPlayer({ useWorker: false })
     document.getElementById('screen').appendChild(window.wsavc.AvcPlayer.canvas)
     window.wsavc.connect("ws://39.106.81.156:5001/video")
@@ -61,35 +66,29 @@ function App() {
   }
 
   const lgInit = () => {
-    // window.addEventListener('gamepadconnected', function(e) {
-    //   navigator.getGamepads().forEach((item) => {
-    //     if (item?.id?.includes?.('G29')) {
-    //       gamePad.current = item
-    //     }
-    //   })
-    // })
-    // setInterval(() => {
-    //   const gamePads = navigator.getGamepads().find(item => item?.id?.includes?.('B696'))
+    setInterval(() => {
+      const gamePads = navigator.getGamepads().find(item => item?.id?.includes?.('Xbox'))
 
-    //   if (!gamePads) return
-    //   const [lgWheel, , , , ,lgThrottle] = gamePads.axes
-    //   const lgWheelValue = Math.round(lgWheel * 100)  / 2 + 50
-    //   const lgThrottleValue = Math.round(lgThrottle * 100)  / 2 + 50
-    //   setLgWheel(100 - lgWheelValue)
-    //   setLgThrottle(100 - lgThrottleValue)
-    //   if (gamePads.buttons[0].touched) {
-    //     setLgGear('R')
-    //   } else if (gamePads.buttons[1].touched) {
-    //     setLgGear('D')
-    //   }
-    //   if (gamePads.buttons[8].touched) {
-    //     setCam(0)
-    //   } else if (gamePads.buttons[9].touched) {
-    //     setCam(100)
-    //   } else {
-    //     setCam(50)
-    //   }
-    // }, 20)
+      if (!gamePads || !gamePads?.axes) return
+      const [, lgThrottle, lgWheel] = gamePads.axes
+
+      const lgWheelValue = Math.round(lgWheel * 100)  / 2 + 50
+      const lgThrottleValue = Math.round(lgThrottle * 100)  / 2 + 50
+      setLgWheel(100 - lgWheelValue)
+      setLgThrottle(100 - lgThrottleValue)
+      if (gamePads.buttons[6].touched) {
+        setLgGear('R')
+      } else if (gamePads.buttons[7].touched) {
+        setLgGear('D')
+      }
+      if (gamePads.buttons[4].touched) {
+        setCam(0)
+      } else if (gamePads.buttons[5].touched) {
+        setCam(100)
+      } else {
+        setCam(50)
+      }
+    }, 20)
   }
 
   useEffect(() => { 
@@ -97,30 +96,37 @@ function App() {
   }, [lgGear])
 
   useEffect(() => {
+    console.log(cam)
     pwmChange(2, cam)
   }, [cam])
 
-  // useEffect(() => {
-  //   socket.emit('setPulseLength', {
-  //     pin: 1,
-  //     data: lgWheel * 19 + 610
-  //   })
-  // }, [lgWheel])
+  useEffect(() => {
+    socket.emit('setPulseLength', {
+      pin: 14,
+      data: (((lgWheel - 50) * 0.5) + 50) * 19 + 610
+    })
+  }, [lgWheel])
 
   useEffect(() => {
     let pwm = 1500
     if (gearValue.current === 'D') {
-      pwm = pwm - (lgThrottle * 5)
+      pwm = pwm - (lgThrottle - 50) * (isLimit ? 5 : 14)
     }
     if (gearValue.current === 'R') {
-      pwm = pwm + (lgThrottle * 5)
+      pwm = pwm + (lgThrottle - 50) * (isLimit ? 4 : 13)
     }
     if (gearValue.current === 'N') return
-
-    socket.emit('setPulseLength', {
-      pin: 0,
-      data: pwm
-    })
+    if (lgThrottle < 50) {
+      pwm = 1500
+    }
+    if (lgThrottle == 50) {
+      socket.emit('channelOff', { pin: 15 })
+    } else {
+      socket.emit('setPulseLength', {
+        pin: 15,
+        data: pwm
+      })
+    }
   }, [lgThrottle])
 
   useEffect(() => {
@@ -203,18 +209,14 @@ function App() {
     videoZero(2)
   }
 
-  useEffect(() => {
-    setInterval(() => {
-      
-      setPannel(navigator.getGamepads()[0].axes)
-    }, 10)
-  }, [])
+  const limitChange = (e) => {
+    setIsLimit(e)
+  }
   
   return (
     <div className="App">
       <div id="screen" />
-      <Keybords socket={socket} videoChange={videoChange}/>
-      {JSON.stringify(pannel)}
+      <Keybords socket={socket} videoChange={videoChange} limitChange={limitChange}/>
       <div className="Console">
         <SliderHandle
           onChange={speedChange}
