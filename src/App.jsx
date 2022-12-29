@@ -29,13 +29,6 @@ socket.on("connect", () => {
   }, 500)
 })
 
-// window.onbeforeunload = function(e){
-//   [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].forEach((pin) => {
-//     socket.emit('channelOff', { pin })
-//   })
-//   e.returnValue=("确定离开当前页面吗？");
-// }
-
 function App() {
   const refSpeed = useRef()
   const gearValue = useRef()
@@ -45,7 +38,8 @@ function App() {
   const [isLimit, setIsLimit] = useState(false)
   const [lgGear, setLgGear] = useState('D')
   const [cam, setCam] = useState(50)
-  
+  const [isFullScreen, setIsFullScreen] = useState(null)
+
   const videoZero = (mode = 3) => {
     if (window.wsavc) {
       window.wsavc.send({ mode })
@@ -212,11 +206,23 @@ function App() {
   const limitChange = (e) => {
     setIsLimit(e)
   }
+
+  useEffect(() => {
+    if (isFullScreen === true) {
+      document.querySelector('.App').requestFullscreen()  
+    } else if (isFullScreen === false) {
+      document.exitFullscreen()
+    }
+  }, [isFullScreen])
+
+  const fullScreen = (e) => {
+    setIsFullScreen(!isFullScreen)
+  }
   
   return (
-    <div className="App">
+    <div className={`App ${isFullScreen ? 'fullScreen' : null}`}>
       <div id="screen" />
-      <Keybords socket={socket} videoChange={videoChange} limitChange={limitChange}/>
+      <Keybords socket={socket} videoChange={videoChange} limitChange={limitChange} fullScreen={fullScreen}/>
       <div className="Console">
         <SliderHandle
           onChange={speedChange}

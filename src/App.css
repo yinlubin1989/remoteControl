@@ -6,6 +6,27 @@
 #screen canvas {
     width: 100%;
 }
+.fullScreen #screen canvas {
+    transform: rotate(90deg);
+    width: 100vh;
+    margin-left: -50vh;
+    height: 100vw;
+    margin-top: -50vw;
+    left: 50%;
+    z-index: 999;
+    top: 50%;
+    position: fixed;
+    /* background-color: gray !important; */
+}
+.fullScreen .Keyboards {
+    padding: 2vw;
+    overflow: hidden;
+    z-index: 99999;
+    position: fixed;
+    transform-origin: left;
+    transform: rotate(90deg);
+    margin-left: 20px;
+}
 #cursor {
     transform: rotate(45deg);
     width: 12px;
