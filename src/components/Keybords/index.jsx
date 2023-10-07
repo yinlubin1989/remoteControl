@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import './index.css'
 
 const Main = ({
-  socket, videoChange, limitChange, fullScreen
+  socket, videoChange, limitChange, fullScreen, onLaunchPannel
 }) => {
   const [b1, setB1] = useState(true);
   const [b2, setB2] = useState(true);
@@ -41,6 +41,9 @@ const Main = ({
       </a>
       <a onClick={fullScreen}>
         全屏
+      </a>
+      <a onClick={onLaunchPannel}>
+        发射器
       </a>
     </div>
   )

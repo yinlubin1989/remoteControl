@@ -4,7 +4,9 @@ import io from 'socket.io-client'
 import CrossHandle from './components/CrossHandle'
 import SliderHandle from './components/SliderHandle'
 import DiskHandle from './components/DiskHandle'
+import Button from './components/Button'
 import Keybords from './components/Keybords'
+import Modal from './components/Modal'
 import Gear from './components/Gear'
 import Direction from './components/Direction'
 
@@ -33,6 +35,8 @@ function App() {
   const refSpeed = useRef()
   const gearValue = useRef()
   const [pannel, setPannel] = useState('')
+  const [candle, setCandle] = useState(0)
+  const [isShowLaunchPanel, setIsShowLaunchPanel] = useState(false)
   const [lgWheel, setLgWheel] = useState(50)
   const [lgThrottle, setLgThrottle] = useState(0)
   const [isLimit, setIsLimit] = useState(false)
@@ -218,11 +222,28 @@ function App() {
   const fullScreen = (e) => {
     setIsFullScreen(!isFullScreen)
   }
+
+  const onStartLaunch = (od) => {
+    setTimeout(() => {
+      setCandle(od + .5)
+      socket.emit('channelOn', { pin: 10 })
+      if (od >= 100) {
+        socket.emit('channelOff', { pin: 10 })
+        setCandle(0)
+        return
+      };
+      onStartLaunch(od + .5)
+    }, 5)
+  }
   
   return (
     <div className={`App ${isFullScreen ? 'fullScreen' : null}`}>
       <div id="screen" />
-      <Keybords socket={socket} videoChange={videoChange} limitChange={limitChange} fullScreen={fullScreen}/>
+      <Keybords socket={socket}
+        videoChange={videoChange}
+        limitChange={limitChange}
+        onLaunchPannel={() => setIsShowLaunchPanel(true)}
+        fullScreen={fullScreen}/>
       <div className="Console">
         <SliderHandle
           onChange={speedChange}
@@ -243,6 +264,27 @@ function App() {
         <Direction onChange={e => pwmChange(14, 100 - e)}/>
       </div>
       <br />
+      <Modal
+        onClose={() => setIsShowLaunchPanel(false)}
+        visible={isShowLaunchPanel}
+      >
+        <div className="launchControl">
+          <a onClick={() => onStartLaunch(1)}>
+            <div><p style={{
+              width: `${candle}%`
+            }} /></div>
+            一号点火
+          </a>
+          <a>
+            <div></div>
+            二号点火
+          </a>
+          <a>
+            <div></div>
+            三号点火
+          </a>
+        </div>
+      </Modal>
       <div className="Arm">
         {/* <SliderHandle onChange={e => {}}/> */}
         <CrossHandle onChange={e => {

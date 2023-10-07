@@ -9,5 +9,6 @@
 body {
     background: rgb(13, 14, 27);
     overflow: hidden;
+    opacity: 0.02;
 }
 

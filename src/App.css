@@ -88,3 +88,16 @@
     left: 3vw;
     top: 0;
 }
+.launchControl {
+    padding: 5vw 2vw;
+}
+.launchControl a {
+    display: flex;
+    font-size: 10px;
+    padding: 2vw 1vw;
+}
+.launchControl a div {
+    border: 1px solid rgba(172, 249, 251, 1);
+    width: 50vw;
+    margin: 0 3vw 0 0;
+}
