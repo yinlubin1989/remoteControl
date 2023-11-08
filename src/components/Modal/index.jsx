@@ -4,7 +4,7 @@ import './index.css'
 const Main = ({
   children, onClose, visible
 }) => {
-  if (!visible) return;
+  if (!visible) return
   return (
     <div className="modal-wrapper">
       <div className="modal">

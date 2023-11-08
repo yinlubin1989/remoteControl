@@ -4,9 +4,9 @@ import './index.css'
 const Main = ({
   socket, videoChange, limitChange, fullScreen, onLaunchPannel
 }) => {
-  const [b1, setB1] = useState(true);
-  const [b2, setB2] = useState(true);
-  const [b3, setB3] = useState(true);
+  const [b1, setB1] = useState(true)
+  const [b2, setB2] = useState(true)
+  const [b3, setB3] = useState(true)
   useEffect(() => {
     limitChange(!b3)
   }, [b3])

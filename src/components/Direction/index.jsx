@@ -4,7 +4,7 @@ import './index.css'
 const Main = ({
   onChange
 }) => {
-  const lastArmXPoint = useRef();
+  const lastArmXPoint = useRef()
   const [armX, setArmX] = useState(50)
   const limitBoundary = (position) => {
     if (position > 100) return 100

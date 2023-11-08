@@ -15,11 +15,16 @@ import './App.css'
 const socket = io('http://39.106.81.156:5005')
 window.socket = socket
 
+// socket.emit('setPulseLength', {
+//   pin: 14,
+//   data: 1000
+// })
+
 socket.on("connect", () => {
-  socket.emit('setPulseLength', {
-    pin: 15,
-    data: 1500
-  })
+  // socket.emit('setPulseLength', {
+  //   pin: 15,
+  //   data: 1500
+  // })
   setTimeout(() => {
     [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].forEach((pin) => {
       socket.emit('channelOff', { pin })
@@ -63,31 +68,31 @@ function App() {
     }
   }
 
-  const lgInit = () => {
-    setInterval(() => {
-      const gamePads = navigator.getGamepads().find(item => item?.id?.includes?.('Xbox'))
+  // const lgInit = () => {
+  //   setInterval(() => {
+  //     const gamePads = navigator.getGamepads().find(item => item?.id?.includes?.('Xbox'))
 
-      if (!gamePads || !gamePads?.axes) return
-      const [, lgThrottle, lgWheel] = gamePads.axes
+  //     if (!gamePads || !gamePads?.axes) return
+  //     const [, lgThrottle, lgWheel] = gamePads.axes
 
-      const lgWheelValue = Math.round(lgWheel * 100)  / 2 + 50
-      const lgThrottleValue = Math.round(lgThrottle * 100)  / 2 + 50
-      setLgWheel(100 - lgWheelValue)
-      setLgThrottle(100 - lgThrottleValue)
-      if (gamePads.buttons[6].touched) {
-        setLgGear('R')
-      } else if (gamePads.buttons[7].touched) {
-        setLgGear('D')
-      }
-      if (gamePads.buttons[4].touched) {
-        setCam(0)
-      } else if (gamePads.buttons[5].touched) {
-        setCam(100)
-      } else {
-        setCam(50)
-      }
-    }, 20)
-  }
+  //     const lgWheelValue = Math.round(lgWheel * 100)  / 2 + 50
+  //     const lgThrottleValue = Math.round(lgThrottle * 100)  / 2 + 50
+  //     setLgWheel(100 - lgWheelValue)
+  //     setLgThrottle(100 - lgThrottleValue)
+  //     if (gamePads.buttons[6].touched) {
+  //       setLgGear('R')
+  //     } else if (gamePads.buttons[7].touched) {
+  //       setLgGear('D')
+  //     }
+  //     if (gamePads.buttons[4].touched) {
+  //       setCam(0)
+  //     } else if (gamePads.buttons[5].touched) {
+  //       setCam(100)
+  //     } else {
+  //       setCam(50)
+  //     }
+  //   }, 20)
+  // }
 
   useEffect(() => { 
     gearValue.current = lgGear
@@ -105,35 +110,36 @@ function App() {
     })
   }, [lgWheel])
 
-  useEffect(() => {
-    let pwm = 1500
-    if (gearValue.current === 'D') {
-      pwm = pwm - (lgThrottle - 50) * (isLimit ? 5 : 14)
-    }
-    if (gearValue.current === 'R') {
-      pwm = pwm + (lgThrottle - 50) * (isLimit ? 4 : 13)
-    }
-    if (gearValue.current === 'N') return
-    if (lgThrottle < 50) {
-      pwm = 1500
-    }
-    if (lgThrottle == 50) {
-      socket.emit('channelOff', { pin: 15 })
-    } else {
-      socket.emit('setPulseLength', {
-        pin: 15,
-        data: pwm
-      })
-    }
-  }, [lgThrottle])
+  // useEffect(() => {
+  //   let pwm = 1500
+  //   if (gearValue.current === 'D') {
+  //     pwm = pwm - (lgThrottle - 50) * (isLimit ? 5 : 14)
+  //   }
+  //   if (gearValue.current === 'R') {
+  //     pwm = pwm + (lgThrottle - 50) * (isLimit ? 4 : 13)
+  //   }
+  //   if (gearValue.current === 'N') return
+  //   if (lgThrottle < 50) {
+  //     pwm = 1500
+  //   }
+  //   if (lgThrottle == 50) {
+  //     socket.emit('channelOff', { pin: 15 })
+  //   } else {
+  //     socket.emit('setPulseLength', {
+  //       pin: 15,
+  //       data: pwm
+  //     })
+  //   }
+  // }, [lgThrottle])
 
   useEffect(() => {
     videoZero()
     initKeyBoard()
     // 好盈1060这个电调需要初始化归零值...
-    pwmChange(15, 50)
+    // pwmChange(15, 50)
 
-    lgInit()
+    // 罗技方向盘
+    // lgInit()
 
     return () => {
       document.getElementById('screen').innerHTML = ''
@@ -175,6 +181,7 @@ function App() {
 
   const onTouchThrottle = () => {
     let pwm = 1500
+    console.log('refSpeed.current', refSpeed.current)
     if (gearValue.current === 'D') {
       pwm = pwm - (refSpeed.current * 5)
     }
@@ -231,11 +238,11 @@ function App() {
         socket.emit('channelOff', { pin: 10 })
         setCandle(0)
         return
-      };
+      }
       onStartLaunch(od + .5)
     }, 5)
   }
-  
+
   return (
     <div className={`App ${isFullScreen ? 'fullScreen' : null}`}>
       <div id="screen" />

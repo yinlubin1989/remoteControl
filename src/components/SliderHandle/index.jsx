@@ -6,11 +6,11 @@ const Main = ({
 }) => {
   const [armY, setArmY] = useState(defalutValue)
 
-  const lastArmYPoint = useRef();
+  const lastArmYPoint = useRef()
 
   const onTouchStart = (event) => {
     const { clientY } = event.targetTouches[0]
-    lastArmYPoint.current = clientY;
+    lastArmYPoint.current = clientY
   }
 
   const limitBoundary = (position) => {
