@@ -10,7 +10,11 @@ import Direction from './components/Direction'
 
 import './App.css'
 
-const socket = io('http://39.106.81.156:5005')
+const controlUrl = import.meta.env.VITE_CONTROL_URL || window.location.origin
+const controlPath = import.meta.env.VITE_CONTROL_PATH || '/car-control/socket.io'
+const videoUrl = import.meta.env.VITE_VIDEO_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/car-video/video`
+
+const socket = io(controlUrl, { path: controlPath })
 window.socket = socket
 
 socket.on("connect", () => {
@@ -47,7 +51,7 @@ function App() {
     }
     window.wsavc = new WSAvcPlayer({ useWorker: false })
     document.getElementById('screen').appendChild(window.wsavc.AvcPlayer.canvas)
-    window.wsavc.connect("ws://39.106.81.156:5001/video")
+    window.wsavc.connect(videoUrl)
     window.wsavc.ws.onopen = () => {
       window.wsavc.send({ mode })
     }
