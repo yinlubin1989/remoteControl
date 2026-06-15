@@ -147,10 +147,7 @@ const TankControl = ({ socket }) => {
   return (
     <section className="TankControl" aria-label="履带车控制">
       <header className="TankHeader">
-        <div>
-          <span className="TankEyebrow">DUAL MOTOR DRIVE</span>
-          <h1>履带差速控制</h1>
-        </div>
+        <h1>履带控制</h1>
         <button className="TankStop" type="button" onPointerDown={stop}>双侧停止</button>
       </header>
 

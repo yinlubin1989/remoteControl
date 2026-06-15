@@ -2,12 +2,11 @@
     width: 50vw;
     height: 50px;
     display: flex;
-    border: 1px solid rgba(172, 249, 251, 1);
+    border: 1px solid #8ed6db;
     border-left: 0;
     border-right: 0;
     position: absolute;
     right: 20px;
-    border-radius: 6px;
     top: 120px;
     touch-action: none;
 }
@@ -17,7 +16,7 @@
     margin-left: -5px;
     margin-top: -5px;
     position: absolute;
-    border: 1px solid rgba(172, 249, 251, 1);
+    border: 1px solid #8ed6db;
     left: 50%;
     top: 50%;
     border-radius: 50%;

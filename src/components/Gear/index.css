@@ -5,7 +5,6 @@
     text-align: center;
     list-style: none;
     font-size: 12px;
-    font-style: italic;
     right: 5px;
     top: 0;
 }
@@ -16,6 +15,5 @@
     border: 1px solid transparent;
 }
 .Gear li.active {
-    border-radius: 2px;
-    border: 1px solid rgba(172, 249, 251, 1);
+    border: 1px solid #8ed6db;
 }

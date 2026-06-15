@@ -3,11 +3,18 @@
     padding: 0;
     user-select: none;
     box-sizing: border-box;
-    color: rgba(172, 249, 251, 1);
+    color: #8ed6db;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 body {
-    background: rgb(13, 14, 27);
+    background: #0d0e1b;
     overflow-x: hidden;
     overflow-y: auto;
+}
+
+button,
+a,
+input {
+    font: inherit;
 }

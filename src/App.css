@@ -1,7 +1,6 @@
 #screen {
     width: 100%;
     position: relative;
-    /* transform: rotate(180deg); */
 }
 .tankMode {
     min-height: 100vh;
@@ -19,7 +18,6 @@
     z-index: 999;
     top: 50%;
     position: fixed;
-    /* background-color: gray !important; */
 }
 .fullScreen .Keyboards {
     padding: 2vw;
@@ -30,20 +28,6 @@
     transform: rotate(90deg);
     margin-left: 20px;
 }
-#cursor {
-    transform: rotate(45deg);
-    width: 12px;
-    height: 12px;
-    box-sizing: border-box;
-    margin: -6px;
-    left: 50%;
-    top: 50%;
-    border: 1px solid #acf9fb;
-    position: absolute;
-}
-/* .App {
-    opacity: 0.1;
-} */
 .Console {
     display: flex;
     padding: 0;
@@ -64,8 +48,7 @@
     line-height: 50px;
     font-size: 10px;
     display: block;
-    border-radius: 2px;
-    border: 1px solid rgba(172, 249, 251, 1);
+    border: 1px solid #8ed6db;
     margin-top: 0px;
     text-align: center;
     margin-top: 16px;
@@ -79,8 +62,7 @@
     line-height: 50px;
     font-size: 10px;
     display: block;
-    border-radius: 2px;
-    border: 1px solid rgba(172, 249, 251, 1);
+    border: 1px solid #8ed6db;
     margin-top: 0px;
     text-align: center;
     margin-top: 16px;

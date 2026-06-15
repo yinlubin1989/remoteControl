@@ -8,8 +8,7 @@
     line-height: 20px;
     font-size: 10px;
     display: block;
-    border-radius: 2px;
-    border: 1px solid rgba(172, 249, 251, 1);
+    border: 1px solid #8ed6db;
     margin-top: 0px;
     text-align: center;
     display: inline-block;
@@ -17,10 +16,11 @@
 }
 .Keyboards a.off {
     text-decoration: line-through;
+    opacity: 0.55;
 }
 
 .Keyboards a.modeSwitch {
     width: 18vw;
-    border-color: #ffb24a;
-    color: #ffd59a;
+    border-color: #c38a3d;
+    color: #c99a59;
 }

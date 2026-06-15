@@ -1,7 +1,7 @@
 .DiskHandle {
     width: 30vw;
     height: 30vw;
-    border: 1px dashed rgba(172, 249, 251, 0.2);
+    border: 1px dashed rgba(142, 214, 219, 0.28);
     position: relative;
     border-radius: 50%;
     margin-right: 10px;   
@@ -9,7 +9,7 @@
 .DiskHandle .rotate {
     width: 100%;
     height: 1px;
-    background: rgba(172, 249, 251, 1);
+    background: #8ed6db;
     position: absolute;
     top: 50%;
     left: 0;
@@ -19,8 +19,8 @@
     content: ' ';
     width: 6px;
     height: 6px;
-    border: 1px solid rgba(172, 249, 251, 1);
-    background: rgb(13, 14, 27);
+    border: 1px solid #8ed6db;
+    background: #0d0e1b;
     position: absolute;
     top: 0;
     border-radius: 50%;
