@@ -5,6 +5,7 @@
     margin-right: 10px;
     border-left: 1px dashed rgba(172, 249, 251, 1);
     padding-top: 100px;
+    touch-action: none;
 }
 .SliderHandle p {
     width: 100%;
@@ -12,6 +13,7 @@
     background: rgba(172, 249, 251, 1);
     position: absolute;
     left: 0;
+    will-change: bottom;
 }
 .SliderHandle p span {
     display: block;

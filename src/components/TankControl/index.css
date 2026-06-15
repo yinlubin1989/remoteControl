@@ -109,8 +109,8 @@
     background: radial-gradient(circle at 38% 32%, #d8ffff, #4eaeb8 26%, #143541 70%);
     box-shadow: 0 8px 24px #000, 0 0 18px rgba(172, 249, 251, 0.36);
     pointer-events: none;
-    transform: translate(-50%, -50%);
-    transition: left 35ms linear, top 35ms linear;
+    transform: translate3d(-50%, -50%, 0);
+    will-change: transform;
 }
 
 .TankSettings {

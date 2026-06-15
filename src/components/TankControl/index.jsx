@@ -10,6 +10,7 @@ import './index.css'
 
 const LEFT_REVERSED_KEY = 'tank-left-reversed'
 const RIGHT_REVERSED_KEY = 'tank-right-reversed'
+const COMMAND_INTERVAL_MS = 1000 / 30
 
 const readBoolean = (key, fallback) => {
   const value = window.localStorage.getItem(key)
@@ -18,42 +19,100 @@ const readBoolean = (key, fallback) => {
 
 const TankControl = ({ socket }) => {
   const padRef = useRef(null)
-  const [stick, setStick] = useState({ x: 0, y: 0 })
+  const stickRef = useRef(null)
+  const leftStatusRef = useRef(null)
+  const rightStatusRef = useRef(null)
+  const padBoundsRef = useRef(null)
+  const activePointerRef = useRef(null)
+  const inputRef = useRef({ x: 0, y: 0 })
+  const frameRef = useRef(null)
+  const commandTimerRef = useRef(null)
+  const lastCommandTimeRef = useRef(0)
   const [leftReversed, setLeftReversed] = useState(() => readBoolean(LEFT_REVERSED_KEY, false))
   const [rightReversed, setRightReversed] = useState(() => readBoolean(RIGHT_REVERSED_KEY, true))
 
-  const stop = useCallback(() => {
-    setStick({ x: 0, y: 0 })
-    emitTankStop(socket)
-  }, [socket])
+  const updateOutputDisplay = useCallback((leftPwm, rightPwm) => {
+    if (leftStatusRef.current) leftStatusRef.current.textContent = `${leftPwm} μs`
+    if (rightStatusRef.current) rightStatusRef.current.textContent = `${rightPwm} μs`
+  }, [])
 
-  const drive = useCallback((x, y) => {
+  const updateStickPosition = useCallback((x, y) => {
+    if (!stickRef.current || !padBoundsRef.current) return
+    const travel = padBoundsRef.current.width * 0.42
+    stickRef.current.style.transform = `translate3d(calc(-50% + ${x * travel}px), calc(-50% + ${y * travel}px), 0)`
+  }, [])
+
+  const stop = useCallback(() => {
+    activePointerRef.current = null
+    inputRef.current = { x: 0, y: 0 }
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current)
+      frameRef.current = null
+    }
+    if (commandTimerRef.current !== null) {
+      clearTimeout(commandTimerRef.current)
+      commandTimerRef.current = null
+    }
+    updateStickPosition(0, 0)
+    updateOutputDisplay(1500, 1500)
+    emitTankStop(socket)
+  }, [socket, updateOutputDisplay, updateStickPosition])
+
+  const sendDriveCommand = useCallback((x, y) => {
     const { left, right } = mixTankDrive(x, -y)
+    const leftPwm = toMotorPwm(left, leftReversed)
+    const rightPwm = toMotorPwm(right, rightReversed)
     socket.emit('setPulseLength', {
       pin: TANK_LEFT_PIN,
-      data: toMotorPwm(left, leftReversed)
+      data: leftPwm
     })
     socket.emit('setPulseLength', {
       pin: TANK_RIGHT_PIN,
-      data: toMotorPwm(right, rightReversed)
+      data: rightPwm
     })
-  }, [leftReversed, rightReversed, socket])
+    updateOutputDisplay(leftPwm, rightPwm)
+  }, [leftReversed, rightReversed, socket, updateOutputDisplay])
+
+  const scheduleUpdate = useCallback(() => {
+    if (frameRef.current !== null) return
+
+    frameRef.current = requestAnimationFrame(timestamp => {
+      frameRef.current = null
+      const { x, y } = inputRef.current
+      updateStickPosition(x, y)
+
+      const elapsed = timestamp - lastCommandTimeRef.current
+      if (elapsed >= COMMAND_INTERVAL_MS) {
+        lastCommandTimeRef.current = timestamp
+        sendDriveCommand(x, y)
+      } else if (commandTimerRef.current === null) {
+        commandTimerRef.current = setTimeout(() => {
+          commandTimerRef.current = null
+          lastCommandTimeRef.current = performance.now()
+          const latestInput = inputRef.current
+          sendDriveCommand(latestInput.x, latestInput.y)
+        }, COMMAND_INTERVAL_MS - elapsed)
+      }
+    })
+  }, [sendDriveCommand, updateStickPosition])
 
   const updateStick = event => {
-    const rect = padRef.current.getBoundingClientRect()
+    const coalescedEvents = event.nativeEvent?.getCoalescedEvents?.()
+    const pointerEvent = coalescedEvents?.[coalescedEvents.length - 1] || event
+    const rect = padBoundsRef.current || padRef.current.getBoundingClientRect()
     const radius = rect.width / 2
-    const rawX = (event.clientX - rect.left - radius) / radius
-    const rawY = (event.clientY - rect.top - radius) / radius
+    const rawX = (pointerEvent.clientX - rect.left - radius) / radius
+    const rawY = (pointerEvent.clientY - rect.top - radius) / radius
     const magnitude = Math.hypot(rawX, rawY)
     const scale = magnitude > 1 ? 1 / magnitude : 1
-    const nextStick = { x: rawX * scale, y: rawY * scale }
-
-    setStick(nextStick)
-    drive(nextStick.x, nextStick.y)
+    inputRef.current = { x: rawX * scale, y: rawY * scale }
+    scheduleUpdate()
   }
 
   const onPointerDown = event => {
-    event.currentTarget.setPointerCapture(event.pointerId)
+    padBoundsRef.current = event.currentTarget.getBoundingClientRect()
+    activePointerRef.current = event.pointerId
+    event.currentTarget.setPointerCapture?.(event.pointerId)
     updateStick(event)
   }
 
@@ -79,6 +138,8 @@ const TankControl = ({ socket }) => {
       socket.off('disconnect', stop)
       window.removeEventListener('blur', stop)
       document.removeEventListener('visibilitychange', onVisibilityChange)
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
+      if (commandTimerRef.current !== null) clearTimeout(commandTimerRef.current)
       stop()
     }
   }, [socket, stop])
@@ -101,7 +162,7 @@ const TankControl = ({ socket }) => {
           aria-label="履带摇杆"
           onPointerDown={onPointerDown}
           onPointerMove={event => {
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) updateStick(event)
+            if (activePointerRef.current === event.pointerId) updateStick(event)
           }}
           onPointerUp={stop}
           onPointerCancel={stop}
@@ -114,11 +175,8 @@ const TankControl = ({ socket }) => {
           <span className="TankDirection TankDirectionLeft">左</span>
           <span className="TankDirection TankDirectionRight">右</span>
           <span
+            ref={stickRef}
             className="TankStick"
-            style={{
-              left: `${50 + stick.x * 42}%`,
-              top: `${50 + stick.y * 42}%`
-            }}
           />
         </div>
 
@@ -126,12 +184,12 @@ const TankControl = ({ socket }) => {
           <div className="TankStatus">
             <span>CH 14</span>
             <strong>左履带</strong>
-            <b>{toMotorPwm(mixTankDrive(stick.x, -stick.y).left, leftReversed)} μs</b>
+            <b ref={leftStatusRef}>1500 μs</b>
           </div>
           <div className="TankStatus">
             <span>CH 15</span>
             <strong>右履带</strong>
-            <b>{toMotorPwm(mixTankDrive(stick.x, -stick.y).right, rightReversed)} μs</b>
+            <b ref={rightStatusRef}>1500 μs</b>
           </div>
           <label className="TankToggle">
             <input
