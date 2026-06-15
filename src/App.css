@@ -3,6 +3,9 @@
     position: relative;
     /* transform: rotate(180deg); */
 }
+.tankMode {
+    min-height: 100vh;
+}
 #screen canvas {
     width: 100%;
 }

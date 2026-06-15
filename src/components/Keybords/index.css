@@ -18,3 +18,9 @@
 .Keyboards a.off {
     text-decoration: line-through;
 }
+
+.Keyboards a.modeSwitch {
+    width: 18vw;
+    border-color: #ffb24a;
+    color: #ffd59a;
+}

@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import './index.css'
 
 const Main = ({
-  socket, videoChange, limitChange, fullScreen
+  socket, videoChange, limitChange, fullScreen, mode, onModeChange
 }) => {
-  const [b1, setB1] = useState(true);
-  const [b2, setB2] = useState(true);
-  const [b3, setB3] = useState(true);
+  const [b1, setB1] = useState(true)
+  const [b2, setB2] = useState(true)
+  const [b3, setB3] = useState(true)
   useEffect(() => {
     limitChange(!b3)
   }, [b3])
@@ -31,16 +31,19 @@ const Main = ({
           setB2(!b2)
         }}
       >后灯</a>
-      <a className={b3 ? 'off' : ''}
+      {mode === 'wheel' && <a className={b3 ? 'off' : ''}
         onClick={() => {
           setB3(!b3)
         }}
-      >限速</a>
+      >限速</a>}
       <a onClick={videoChange}>
         图传
       </a>
       <a onClick={fullScreen}>
         全屏
+      </a>
+      <a className="modeSwitch" onClick={() => onModeChange(mode === 'wheel' ? 'tank' : 'wheel')}>
+        {mode === 'wheel' ? '切换履带车' : '切换轮式车'}
       </a>
     </div>
   )
