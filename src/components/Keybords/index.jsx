@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import './index.css'
 
 const Main = ({
-  socket, videoChange, limitChange, fullScreen
+  socket, limitChange, fullScreen, openVideoSettings
 }) => {
   const [b1, setB1] = useState(true);
   const [b2, setB2] = useState(true);
@@ -36,11 +36,11 @@ const Main = ({
           setB3(!b3)
         }}
       >限速</a>
-      <a onClick={videoChange}>
-        图传
-      </a>
       <a onClick={fullScreen}>
         全屏
+      </a>
+      <a onClick={openVideoSettings}>
+        图传设置
       </a>
     </div>
   )

@@ -14,6 +14,11 @@
     text-align: center;
     display: inline-block;
     margin-right: 2vw;
+    white-space: nowrap;
+    vertical-align: top;
+}
+.Keyboards a:last-child {
+    min-width: 44px;
 }
 .Keyboards a.off {
     text-decoration: line-through;
