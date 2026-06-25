@@ -68,14 +68,12 @@ const VoiceControls = ({ socket }) => {
     setLocalTrackEnabled(false)
     voiceSenderRef.current?.replaceTrack(null).catch(() => {})
 
-    if (
-      endTalkSession
-      && sessionModeRef.current === 'talk'
-      && sessionRef.current
-    ) {
-      socket.emit('voice:leave', {
-        sessionId: sessionRef.current,
-      })
+    if (endTalkSession && sessionModeRef.current === 'talk') {
+      if (sessionRef.current) {
+        socket.emit('voice:leave', {
+          sessionId: sessionRef.current,
+        })
+      }
       closePeer()
       sessionRef.current = null
       sessionModeRef.current = 'ptt'
@@ -252,6 +250,18 @@ const VoiceControls = ({ socket }) => {
       if (payload.sessionId && payload.status === 'connecting') {
         sessionRef.current = payload.sessionId
         sessionModeRef.current = payload.mode || sessionModeRef.current
+
+        if (
+          sessionModeRef.current === 'talk'
+          && !wantsSpeakingRef.current
+        ) {
+          socket.emit('voice:leave', {
+            sessionId: payload.sessionId,
+          })
+          resetVoice()
+          return
+        }
+
         restartingRef.current = false
         setStatus('connecting')
         setDetail(
@@ -412,9 +422,19 @@ const VoiceControls = ({ socket }) => {
   }
 
   const startSpeaking = async event => {
-    if (status !== 'connected') {
+    if (
+      status === 'busy'
+      || (activeStatuses.has(status) && status !== 'connected')
+    ) {
       return
     }
+
+    if (!window.RTCPeerConnection) {
+      setStatus('error')
+      setDetail('当前浏览器不支持 WebRTC 语音')
+      return
+    }
+
     event.currentTarget.setPointerCapture?.(event.pointerId)
     wantsSpeakingRef.current = true
     setSpeaking(true)
@@ -423,13 +443,15 @@ const VoiceControls = ({ socket }) => {
     try {
       const stream = await ensureLocalMicStream()
       const track = stream.getAudioTracks()[0]
-      if (!track || !voiceSenderRef.current) {
+      if (!track) {
         return
       }
       if (!wantsSpeakingRef.current) {
         setLocalTrackEnabled(false)
         stopLocalMedia()
-        await voiceSenderRef.current.replaceTrack(null)
+        if (voiceSenderRef.current) {
+          await voiceSenderRef.current.replaceTrack(null)
+        }
         return
       }
       track.enabled = true
