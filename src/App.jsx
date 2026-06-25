@@ -33,6 +33,14 @@ const loadCustomSettings = () => {
   }
 }
 
+const isIOSDevice = () => (
+  /iPad|iPhone|iPod/.test(window.navigator.userAgent)
+  || (
+    window.navigator.platform === 'MacIntel'
+    && window.navigator.maxTouchPoints > 1
+  )
+)
+
 const socket = io()
 window.socket = socket
 
@@ -62,7 +70,7 @@ function App() {
   const [isLimit, setIsLimit] = useState(false)
   const [lgGear, setLgGear] = useState('D')
   const [cam, setCam] = useState(50)
-  const [isFullScreen, setIsFullScreen] = useState(null)
+  const [isFullScreen, setIsFullScreen] = useState(false)
   const [videoProfile, setVideoProfile] = useState(() => {
     const savedProfile = window.localStorage.getItem('video-profile')
     return ['low', 'wide', 'clear', 'full', 'custom'].includes(savedProfile)
@@ -277,20 +285,59 @@ function App() {
     setIsLimit(e)
   }
 
-  useEffect(() => {
-    if (isFullScreen === true) {
-      document.querySelector('.App').requestFullscreen()  
-    } else if (isFullScreen === false) {
-      document.exitFullscreen()
-    }
-  }, [isFullScreen])
+  const usePseudoFullscreen = isIOSDevice() || (
+    new URLSearchParams(window.location.search).get('fullscreen') === 'pseudo'
+  )
 
-  const fullScreen = (e) => {
-    setIsFullScreen(!isFullScreen)
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!usePseudoFullscreen && !document.fullscreenElement) {
+        setIsFullScreen(false)
+      }
+    }
+
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange)
+      document.documentElement.classList.remove('VideoPseudoFullscreenOpen')
+    }
+  }, [usePseudoFullscreen])
+
+  useEffect(() => {
+    document.documentElement.classList.toggle(
+      'VideoPseudoFullscreenOpen',
+      usePseudoFullscreen && isFullScreen,
+    )
+  }, [isFullScreen, usePseudoFullscreen])
+
+  const fullScreen = async () => {
+    const entering = !isFullScreen
+    setIsFullScreen(entering)
+
+    if (usePseudoFullscreen) {
+      return
+    }
+
+    try {
+      if (entering) {
+        const app = document.querySelector('.App')
+        await app?.requestFullscreen?.()
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      }
+    } catch (error) {
+      setIsFullScreen(entering)
+    }
   }
   
   return (
-    <div className={`App ${isFullScreen ? 'fullScreen' : null}`}>
+    <div
+      className={[
+        'App',
+        isFullScreen ? 'fullScreen' : '',
+        isFullScreen && usePseudoFullscreen ? 'pseudoFullScreen' : '',
+      ].filter(Boolean).join(' ')}
+    >
       <div
         id="screen"
         className={videoProfile === 'full' ? 'FullFrame' : ''}
@@ -322,6 +369,7 @@ function App() {
         socket={socket}
         limitChange={limitChange}
         fullScreen={fullScreen}
+        isFullScreen={isFullScreen}
         openVideoSettings={openVideoSettings}
       />
       <div className="Console">

@@ -1,19 +1,21 @@
 .Keyboards {
     padding: 2vw;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2vw;
     overflow: hidden;
 }
 .Keyboards a{
+    flex: 0 0 auto;
     width: 10vw;
     height: 20px;
     line-height: 20px;
     font-size: 10px;
-    display: block;
     border-radius: 2px;
     border: 1px solid rgba(172, 249, 251, 1);
-    margin-top: 0px;
     text-align: center;
     display: inline-block;
-    margin-right: 2vw;
     white-space: nowrap;
     vertical-align: top;
 }
@@ -22,4 +24,18 @@
 }
 .Keyboards a.off {
     text-decoration: line-through;
+}
+
+@media (max-width: 760px) {
+    .Keyboards {
+        gap: 4px;
+    }
+
+    .Keyboards a {
+        width: auto;
+        min-width: 0;
+        height: 30px;
+        padding-inline: 7px;
+        line-height: 28px;
+    }
 }

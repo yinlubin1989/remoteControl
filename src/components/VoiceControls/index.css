@@ -1,0 +1,62 @@
+.VoiceControls {
+    display: inline-flex;
+    align-items: center;
+    gap: 2vw;
+    vertical-align: top;
+}
+
+.VoiceControls audio {
+    display: none;
+}
+
+.VoiceButton {
+    appearance: none;
+    min-width: 72px;
+    height: 22px;
+    padding: 0 8px;
+    color: #acf9fb;
+    background: transparent;
+    border: 1px solid rgba(172, 249, 251, 1);
+    border-radius: 2px;
+    font-size: 10px;
+    line-height: 20px;
+    text-align: center;
+    white-space: nowrap;
+    touch-action: none;
+    cursor: pointer;
+}
+
+.VoiceButton.active {
+    color: #041218;
+    background: #acf9fb;
+}
+
+.VoiceButton.transmitting {
+    color: #041218;
+    background: #ffb76a;
+    border-color: #ffb76a;
+}
+
+.VoiceButton:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+}
+
+.VoiceControls--busy .VoiceButton:first-of-type,
+.VoiceControls--error .VoiceButton:first-of-type {
+    border-color: rgba(255, 183, 106, 0.9);
+    color: #ffdda8;
+}
+
+@media (max-width: 760px) {
+    .VoiceControls {
+        gap: 4px;
+    }
+
+    .VoiceButton {
+        min-width: 0;
+        height: 30px;
+        line-height: 28px;
+        padding-inline: 7px;
+    }
+}

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
+import VoiceControls from '../VoiceControls'
 import './index.css'
 
 const Main = ({
-  socket, limitChange, fullScreen, openVideoSettings
+  socket, limitChange, fullScreen, isFullScreen, openVideoSettings
 }) => {
   const [b1, setB1] = useState(true);
   const [b2, setB2] = useState(true);
@@ -37,11 +38,12 @@ const Main = ({
         }}
       >限速</a>
       <a onClick={fullScreen}>
-        全屏
+        {isFullScreen ? '退出全屏' : '全屏'}
       </a>
       <a onClick={openVideoSettings}>
         图传设置
       </a>
+      <VoiceControls socket={socket} />
     </div>
   )
 }
