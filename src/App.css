@@ -1,3 +1,18 @@
+.App,
+.App * {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+html,
+body,
+#root {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
 #screen {
     width: 100%;
     position: relative;
