@@ -162,10 +162,25 @@ const VoiceControls = ({ socket }) => {
       bundlePolicy: 'max-bundle',
     })
     peerRef.current = peer
-    const transceiver = peer.addTransceiver('audio', {
-      direction: 'sendrecv',
-    })
+
+    const localTrack = localStreamRef.current?.getAudioTracks()[0]
+    const shouldSendImmediately = wantsSpeakingRef.current
+      && localTrack
+      && localTrack.readyState === 'live'
+    const transceiver = shouldSendImmediately
+      ? peer.addTransceiver(localTrack, {
+        direction: 'sendrecv',
+        streams: [localStreamRef.current],
+      })
+      : peer.addTransceiver('audio', {
+        direction: 'sendrecv',
+      })
     voiceSenderRef.current = transceiver.sender
+    if (shouldSendImmediately) {
+      localTrack.enabled = true
+      setSpeaking(true)
+      setDetail('正在连接车端音箱')
+    }
 
     peer.onicecandidate = event => {
       if (!event.candidate || !sessionRef.current) {
