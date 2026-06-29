@@ -43,14 +43,17 @@ const isIOSDevice = () => (
 
 const socket = io()
 window.socket = socket
+const THROTTLE_NEUTRAL = 1500
+const BRAKE_PWM_OFFSET = 300
 
 socket.on("connect", () => {
   socket.emit('setPulseLength', {
     pin: 15,
-    data: 1500
+    data: THROTTLE_NEUTRAL
   })
   setTimeout(() => {
     [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].forEach((pin) => {
+      if (pin === 15) return
       socket.emit('channelOff', { pin })
     })
   }, 500)
@@ -138,7 +141,7 @@ function App() {
   }, [lgWheel])
 
   useEffect(() => {
-    let pwm = 1500
+    let pwm = THROTTLE_NEUTRAL
     if (gearValue.current === 'D') {
       pwm = pwm - (lgThrottle - 50) * (isLimit ? 5 : 14)
     }
@@ -147,10 +150,10 @@ function App() {
     }
     if (gearValue.current === 'N') return
     if (lgThrottle < 50) {
-      pwm = 1500
+      pwm = THROTTLE_NEUTRAL
     }
-    if (lgThrottle == 50) {
-      socket.emit('channelOff', { pin: 15 })
+    if (lgThrottle === 50) {
+      setThrottleNeutral()
     } else {
       socket.emit('setPulseLength', {
         pin: 15,
@@ -220,12 +223,19 @@ function App() {
     })
   }
 
+  const setThrottleNeutral = () => {
+    socket.emit('setPulseLength', {
+      pin: 15,
+      data: THROTTLE_NEUTRAL
+    })
+  }
+
   const speedChange = (pwm) => {
     refSpeed.current = pwm
   }
 
   const onTouchThrottle = () => {
-    let pwm = 1500
+    let pwm = THROTTLE_NEUTRAL
     if (gearValue.current === 'D') {
       pwm = pwm - (refSpeed.current * 5)
     }
@@ -240,7 +250,7 @@ function App() {
   }
 
   const onTouchEndThrottle = () => {
-    socket.emit('channelOff', { pin: 15 })
+    setThrottleNeutral()
   }
 
   const gearChange = (gear) => {
@@ -248,9 +258,17 @@ function App() {
   }
 
   const onTouchBrake = () => {
+    let pwm = THROTTLE_NEUTRAL
+    if (gearValue.current === 'D') {
+      pwm = THROTTLE_NEUTRAL + BRAKE_PWM_OFFSET
+    }
+    if (gearValue.current === 'R') {
+      pwm = THROTTLE_NEUTRAL - BRAKE_PWM_OFFSET
+    }
+    if (gearValue.current === 'N') return
     socket.emit('setPulseLength', {
       pin: 15,
-      data: 1500
+      data: pwm
     })
   }
 
@@ -383,10 +401,12 @@ function App() {
         <a className="Start"
           onTouchStart={onTouchThrottle}
           onTouchEnd={onTouchEndThrottle}
+          onTouchCancel={onTouchEndThrottle}
         >油门</a>
         <a className="Brake"
           onTouchStart={onTouchBrake}
           onTouchEnd={onTouchEndThrottle}
+          onTouchCancel={onTouchEndThrottle}
         >stop</a>
         <Gear onChange={gearChange}/>
         <Direction onChange={e => pwmChange(14, 100 - e)}/>
