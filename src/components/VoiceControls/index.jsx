@@ -9,8 +9,8 @@ const activeStatuses = new Set([
   'reconnecting',
 ])
 
-const getListenButtonLabel = status => {
-  if (activeStatuses.has(status)) {
+const getListenButtonLabel = (status, mode) => {
+  if (activeStatuses.has(status) && mode !== 'talk') {
     return '关闭声音'
   }
   if (status === 'busy') {
@@ -22,12 +22,15 @@ const getListenButtonLabel = status => {
   return '打开声音'
 }
 
-const getListenButtonTitle = (status, detail) => {
+const getListenButtonTitle = (status, detail, mode) => {
   if (detail) {
     return detail
   }
-  if (status === 'connected') {
+  if (status === 'connected' && mode !== 'talk') {
     return '正在收听车端声音'
+  }
+  if (mode === 'talk' && activeStatuses.has(status)) {
+    return '车端音箱已预连接，点击可改为打开树莓派麦克风'
   }
   if (status === 'requesting') {
     return '正在打开树莓派麦克风'
@@ -38,6 +41,9 @@ const getListenButtonTitle = (status, detail) => {
 const VoiceControls = ({ socket }) => {
   const [status, setStatus] = useState('idle')
   const [speaking, setSpeaking] = useState(false)
+  const [talkConnecting, setTalkConnecting] = useState(false)
+  const [talkReady, setTalkReady] = useState(false)
+  const [sessionMode, setSessionMode] = useState('ptt')
   const [detail, setDetail] = useState('')
 
   const audioRef = useRef()
@@ -50,6 +56,12 @@ const VoiceControls = ({ socket }) => {
   const retryCountRef = useRef(0)
   const restartingRef = useRef(false)
   const wantsSpeakingRef = useRef(false)
+  const lastTouchAtRef = useRef(0)
+
+  const setVoiceMode = mode => {
+    sessionModeRef.current = mode
+    setSessionMode(mode)
+  }
 
   const setLocalTrackEnabled = enabled => {
     localStreamRef.current
@@ -61,23 +73,37 @@ const VoiceControls = ({ socket }) => {
 
   const stopSpeaking = ({
     updateDetail = true,
-    endTalkSession = true,
+    endTalkSession = false,
+    reason = 'ui-stop',
   } = {}) => {
     wantsSpeakingRef.current = false
     setSpeaking(false)
+    setTalkConnecting(false)
     setLocalTrackEnabled(false)
+
+    if (sessionModeRef.current === 'talk' && !endTalkSession) {
+      if (updateDetail && sessionRef.current) {
+        setDetail(talkReady ? '车端音箱已就绪' : '正在预连接车端音箱')
+      }
+      return
+    }
+
     voiceSenderRef.current?.replaceTrack(null).catch(() => {})
 
     if (endTalkSession && sessionModeRef.current === 'talk') {
       if (sessionRef.current) {
+        emitDebug('stop-speaking', {
+          message: reason,
+        })
         socket.emit('voice:leave', {
           sessionId: sessionRef.current,
         })
       }
       closePeer()
       sessionRef.current = null
-      sessionModeRef.current = 'ptt'
+      setVoiceMode('ptt')
       stopLocalMedia()
+      setTalkReady(false)
       setStatus('idle')
       setDetail('')
       return
@@ -115,7 +141,8 @@ const VoiceControls = ({ socket }) => {
     stopSpeaking({ updateDetail: false, endTalkSession: false })
     closePeer()
     sessionRef.current = null
-    sessionModeRef.current = 'ptt'
+    setVoiceMode('ptt')
+    setTalkReady(false)
     if (!keepStream) {
       stopLocalMedia()
     }
@@ -126,9 +153,20 @@ const VoiceControls = ({ socket }) => {
   }
 
   const emitJoin = (mode = 'ptt') => {
-    sessionModeRef.current = mode
+    setVoiceMode(mode)
     socket.emit('voice:join', {
       mode,
+    })
+  }
+
+  const emitDebug = (event, extra = {}) => {
+    if (!sessionRef.current) {
+      return
+    }
+    socket.emit('voice:debug', {
+      sessionId: sessionRef.current,
+      event,
+      ...extra,
     })
   }
 
@@ -147,6 +185,7 @@ const VoiceControls = ({ socket }) => {
     restartingRef.current = true
     setStatus('reconnecting')
     setDetail('网络波动，正在重连')
+    setTalkReady(false)
     socket.emit('voice:leave', {
       sessionId: sessionRef.current,
     })
@@ -159,28 +198,8 @@ const VoiceControls = ({ socket }) => {
     closePeer()
     const peer = new RTCPeerConnection({
       iceServers,
-      bundlePolicy: 'max-bundle',
     })
     peerRef.current = peer
-
-    const localTrack = localStreamRef.current?.getAudioTracks()[0]
-    const shouldSendImmediately = wantsSpeakingRef.current
-      && localTrack
-      && localTrack.readyState === 'live'
-    const transceiver = shouldSendImmediately
-      ? peer.addTransceiver(localTrack, {
-        direction: 'sendrecv',
-        streams: [localStreamRef.current],
-      })
-      : peer.addTransceiver('audio', {
-        direction: 'sendrecv',
-      })
-    voiceSenderRef.current = transceiver.sender
-    if (shouldSendImmediately) {
-      localTrack.enabled = true
-      setSpeaking(true)
-      setDetail('正在连接车端音箱')
-    }
 
     peer.onicecandidate = event => {
       if (!event.candidate || !sessionRef.current) {
@@ -213,6 +232,9 @@ const VoiceControls = ({ socket }) => {
         restartingRef.current = false
         retryCountRef.current = 0
         setStatus('connected')
+        if (sessionModeRef.current === 'talk') {
+          setTalkReady(true)
+        }
         const localTrack = localStreamRef.current?.getAudioTracks()[0]
         if (
           wantsSpeakingRef.current
@@ -222,11 +244,13 @@ const VoiceControls = ({ socket }) => {
           localTrack.enabled = true
           voiceSenderRef.current.replaceTrack(localTrack).catch(() => {})
           setSpeaking(true)
+          setTalkConnecting(false)
           setDetail('正在向车端说话')
         } else {
+          setTalkConnecting(false)
           setDetail(
             sessionModeRef.current === 'talk'
-              ? '车端播放已连接'
+              ? '车端音箱已就绪'
               : '正在收听车端声音',
           )
         }
@@ -238,6 +262,43 @@ const VoiceControls = ({ socket }) => {
     }
 
     return peer
+  }
+
+  const attachLocalMicForAnswer = async peer => {
+    const localTrack = localStreamRef.current?.getAudioTracks()[0]
+    const transceivers = peer.getTransceivers
+      ? peer.getTransceivers()
+      : []
+    const audioTransceiver = transceivers.find(transceiver => (
+      transceiver.receiver?.track?.kind === 'audio'
+      || transceiver.sender?.track?.kind === 'audio'
+    ))
+
+    if (audioTransceiver) {
+      if (sessionModeRef.current === 'talk') {
+        audioTransceiver.direction = 'sendrecv'
+      }
+      voiceSenderRef.current = audioTransceiver.sender
+      if (localTrack?.readyState === 'live') {
+        localTrack.enabled = wantsSpeakingRef.current
+        await audioTransceiver.sender.replaceTrack(localTrack)
+        if (wantsSpeakingRef.current) {
+          setTalkConnecting(true)
+          setDetail('正在建立语音通道')
+        }
+        emitDebug('mic-attached-to-offer-transceiver')
+      }
+      return
+    }
+
+    if (wantsSpeakingRef.current && localTrack?.readyState === 'live') {
+      localTrack.enabled = true
+      const sender = peer.addTrack(localTrack, localStreamRef.current)
+      voiceSenderRef.current = sender
+      setTalkConnecting(true)
+      setDetail('正在建立语音通道')
+      emitDebug('mic-attached-with-add-track')
+    }
   }
 
   useEffect(() => {
@@ -264,21 +325,11 @@ const VoiceControls = ({ socket }) => {
 
       if (payload.sessionId && payload.status === 'connecting') {
         sessionRef.current = payload.sessionId
-        sessionModeRef.current = payload.mode || sessionModeRef.current
-
-        if (
-          sessionModeRef.current === 'talk'
-          && !wantsSpeakingRef.current
-        ) {
-          socket.emit('voice:leave', {
-            sessionId: payload.sessionId,
-          })
-          resetVoice()
-          return
-        }
+        setVoiceMode(payload.mode || sessionModeRef.current)
 
         restartingRef.current = false
         setStatus('connecting')
+        setTalkReady(false)
         setDetail(
           sessionModeRef.current === 'talk'
             ? '正在连接车端音箱'
@@ -293,6 +344,22 @@ const VoiceControls = ({ socket }) => {
         && payload.status !== 'mode-changed'
       ) {
         setStatus(payload.status)
+        if (sessionModeRef.current === 'talk') {
+          if (payload.status === 'remote-audio-ready') {
+            setTalkReady(true)
+            setTalkConnecting(false)
+            if (wantsSpeakingRef.current) {
+              setSpeaking(true)
+              setDetail('正在向车端说话')
+            } else {
+              setSpeaking(false)
+              setDetail('车端音箱已就绪')
+            }
+          } else if (payload.status === 'pipeline-ready') {
+            setTalkConnecting(true)
+            setDetail('正在建立语音通道')
+          }
+        }
       }
     }
 
@@ -307,9 +374,11 @@ const VoiceControls = ({ socket }) => {
 
       try {
         if (payload.description?.type === 'offer') {
+          emitDebug('offer-received')
           await peerRef.current.setRemoteDescription(
             payload.description,
           )
+          await attachLocalMicForAnswer(peerRef.current)
           for (const candidate of pendingCandidatesRef.current) {
             await peerRef.current.addIceCandidate(candidate)
           }
@@ -320,6 +389,7 @@ const VoiceControls = ({ socket }) => {
             sessionId: sessionRef.current,
             description: peerRef.current.localDescription,
           })
+          emitDebug('answer-sent')
         } else if (payload.candidate) {
           if (peerRef.current.remoteDescription) {
             await peerRef.current.addIceCandidate(payload.candidate)
@@ -330,6 +400,9 @@ const VoiceControls = ({ socket }) => {
       } catch (error) {
         setStatus('error')
         setDetail(`语音协商失败：${error.message}`)
+        emitDebug('signal-error', {
+          message: error.message,
+        })
       }
     }
 
@@ -391,7 +464,7 @@ const VoiceControls = ({ socket }) => {
   }, [socket])
 
   const toggleListening = async () => {
-    if (activeStatuses.has(status)) {
+    if (activeStatuses.has(status) && sessionModeRef.current !== 'talk') {
       socket.emit('voice:leave', {
         sessionId: sessionRef.current,
       })
@@ -409,7 +482,38 @@ const VoiceControls = ({ socket }) => {
     setDetail('正在打开车端麦克风')
     retryCountRef.current = 0
     audioRef.current?.play().catch(() => {})
+    if (sessionModeRef.current === 'talk' && sessionRef.current) {
+      socket.emit('voice:leave', {
+        sessionId: sessionRef.current,
+      })
+      resetVoice({ keepStatus: true })
+    }
     emitJoin('ptt')
+  }
+
+  const connectTalkAudio = event => {
+    event?.preventDefault?.()
+
+    if (status === 'busy') {
+      return
+    }
+
+    if (!window.RTCPeerConnection) {
+      setStatus('error')
+      setDetail('当前浏览器不支持 WebRTC 语音')
+      return
+    }
+
+    if (sessionModeRef.current === 'talk' && sessionRef.current) {
+      return
+    }
+
+    setStatus('requesting')
+    setTalkReady(false)
+    setTalkConnecting(true)
+    setDetail('正在连接车端音箱')
+    retryCountRef.current = 0
+    emitJoin('talk')
   }
 
   const ensureLocalMicStream = async () => {
@@ -437,10 +541,22 @@ const VoiceControls = ({ socket }) => {
   }
 
   const startSpeaking = async event => {
+    const eventType = event?.type || ''
+    if (eventType.startsWith('touch')) {
+      lastTouchAtRef.current = Date.now()
+    }
     if (
-      status === 'busy'
-      || (activeStatuses.has(status) && status !== 'connected')
+      eventType.startsWith('mouse')
+      && Date.now() - lastTouchAtRef.current < 800
     ) {
+      return
+    }
+
+    if (wantsSpeakingRef.current) {
+      return
+    }
+
+    if (status === 'busy' || !talkReady) {
       return
     }
 
@@ -450,10 +566,11 @@ const VoiceControls = ({ socket }) => {
       return
     }
 
-    event.currentTarget.setPointerCapture?.(event.pointerId)
+    event.preventDefault?.()
     wantsSpeakingRef.current = true
-    setSpeaking(true)
-    setDetail('正在讲话')
+    setSpeaking(false)
+    setTalkConnecting(true)
+    setDetail('正在连接车端音箱')
 
     try {
       const stream = await ensureLocalMicStream()
@@ -463,6 +580,7 @@ const VoiceControls = ({ socket }) => {
       }
       if (!wantsSpeakingRef.current) {
         setLocalTrackEnabled(false)
+        setTalkConnecting(false)
         stopLocalMedia()
         if (voiceSenderRef.current) {
           await voiceSenderRef.current.replaceTrack(null)
@@ -470,8 +588,13 @@ const VoiceControls = ({ socket }) => {
         return
       }
       track.enabled = true
-      if (status === 'connected' && voiceSenderRef.current) {
-        await voiceSenderRef.current.replaceTrack(track)
+      if (voiceSenderRef.current) {
+        if (voiceSenderRef.current.track !== track) {
+          await voiceSenderRef.current.replaceTrack(track)
+        }
+        setTalkConnecting(false)
+        setSpeaking(true)
+        setDetail('正在向车端说话')
         return
       }
 
@@ -486,6 +609,7 @@ const VoiceControls = ({ socket }) => {
     } catch (error) {
       wantsSpeakingRef.current = false
       setSpeaking(false)
+      setTalkConnecting(false)
       setLocalTrackEnabled(false)
       setDetail(
         error.name === 'NotAllowedError'
@@ -495,13 +619,39 @@ const VoiceControls = ({ socket }) => {
     }
   }
 
-  const talkDisabled = status === 'busy'
-    || (activeStatuses.has(status) && status !== 'connected')
-  const talkTitle = status === 'connected'
-    ? '按住后网页端讲话，树莓派播放'
-    : status === 'busy'
-      ? '语音正在被其他页面使用'
-      : '按住后网页端讲话，树莓派播放'
+  const shouldIgnoreSyntheticMouse = event => {
+    const eventType = event?.type || ''
+    return eventType.startsWith('mouse')
+      && Date.now() - lastTouchAtRef.current < 1200
+  }
+
+  const handleStopSpeaking = event => {
+    if (shouldIgnoreSyntheticMouse(event)) {
+      return
+    }
+    event?.preventDefault?.()
+    stopSpeaking({
+      reason: event?.type || 'ui-stop',
+    })
+  }
+
+  const talkSessionActive = sessionMode === 'talk' && (
+    activeStatuses.has(status) || status === 'requesting'
+  )
+  const talkCanSpeak = talkSessionActive && talkReady && !talkConnecting
+  const talkDisabled = status === 'busy' || (talkConnecting && !talkReady)
+  const talkButtonText = talkConnecting
+    ? '连接中'
+    : !talkSessionActive
+      ? '连接音频'
+      : speaking
+        ? '讲话中'
+        : '按住说话'
+  const talkTitle = status === 'busy'
+    ? '语音正在被其他页面使用'
+    : talkCanSpeak
+      ? '按住后网页端讲话，树莓派播放'
+      : '先连接到树莓派音箱'
 
   return (
     <span
@@ -511,24 +661,27 @@ const VoiceControls = ({ socket }) => {
       <audio ref={audioRef} autoPlay playsInline />
       <button
         type="button"
-        className={activeStatuses.has(status) ? 'VoiceButton active' : 'VoiceButton'}
-        title={getListenButtonTitle(status, detail)}
+        className={activeStatuses.has(status) && sessionMode !== 'talk' ? 'VoiceButton active' : 'VoiceButton'}
+        title={getListenButtonTitle(status, detail, sessionMode)}
         onClick={toggleListening}
       >
-        {getListenButtonLabel(status)}
+        {getListenButtonLabel(status, sessionMode)}
       </button>
       <button
         type="button"
-        className={`VoiceButton VoiceTalkButton${speaking ? ' transmitting' : ''}`}
+        className={`VoiceButton VoiceTalkButton${speaking ? ' transmitting' : ''}${talkConnecting ? ' connecting' : ''}`}
         disabled={talkDisabled}
         title={talkTitle}
-        onPointerDown={startSpeaking}
-        onPointerUp={stopSpeaking}
-        onPointerCancel={stopSpeaking}
-        onLostPointerCapture={stopSpeaking}
+        onClick={talkSessionActive ? undefined : connectTalkAudio}
+        onMouseDown={talkCanSpeak ? startSpeaking : undefined}
+        onMouseUp={talkCanSpeak ? handleStopSpeaking : undefined}
+        onMouseLeave={talkCanSpeak ? handleStopSpeaking : undefined}
+        onTouchStart={talkCanSpeak ? startSpeaking : undefined}
+        onTouchEnd={talkCanSpeak ? handleStopSpeaking : undefined}
+        onTouchCancel={talkCanSpeak ? handleStopSpeaking : undefined}
         onContextMenu={event => event.preventDefault()}
       >
-        {speaking ? '讲话中' : '按住说话'}
+        {talkButtonText}
       </button>
     </span>
   )
