@@ -45,6 +45,12 @@ const socket = io()
 window.socket = socket
 const THROTTLE_NEUTRAL = 1500
 const BRAKE_PWM_OFFSET = 300
+const STEERING_DIRECTION_KEY = 'steering-direction'
+const MOTOR_DIRECTION_KEY = 'motor-direction'
+
+const loadDirectionSetting = (key) => (
+  window.localStorage.getItem(key) === 'reverse'
+)
 
 socket.on("connect", () => {
   socket.emit('setPulseLength', {
@@ -72,8 +78,16 @@ function App() {
   const [lgThrottle, setLgThrottle] = useState(0)
   const [isLimit, setIsLimit] = useState(false)
   const [lgGear, setLgGear] = useState('D')
+  const [steeringReversed, setSteeringReversed] = useState(() => (
+    loadDirectionSetting(STEERING_DIRECTION_KEY)
+  ))
+  const [motorReversed, setMotorReversed] = useState(() => (
+    loadDirectionSetting(MOTOR_DIRECTION_KEY)
+  ))
   const [cam, setCam] = useState(50)
   const [isFullScreen, setIsFullScreen] = useState(false)
+  const steeringReversedRef = useRef(steeringReversed)
+  const motorReversedRef = useRef(motorReversed)
   const [videoProfile, setVideoProfile] = useState(() => {
     const savedProfile = window.localStorage.getItem('video-profile')
     return ['low', 'wide', 'clear', 'full', 'custom'].includes(savedProfile)
@@ -129,16 +143,35 @@ function App() {
   }, [lgGear])
 
   useEffect(() => {
+    steeringReversedRef.current = steeringReversed
+    window.localStorage.setItem(
+      STEERING_DIRECTION_KEY,
+      steeringReversed ? 'reverse' : 'normal',
+    )
+    pwmChange(14, 50)
+  }, [steeringReversed])
+
+  useEffect(() => {
+    motorReversedRef.current = motorReversed
+    window.localStorage.setItem(
+      MOTOR_DIRECTION_KEY,
+      motorReversed ? 'reverse' : 'normal',
+    )
+    setThrottleNeutral()
+  }, [motorReversed])
+
+  useEffect(() => {
     console.log(cam)
     pwmChange(2, cam)
   }, [cam])
 
   useEffect(() => {
+    const wheelValue = getSteeringValue(lgWheel)
     socket.emit('setPulseLength', {
       pin: 14,
-      data: (((lgWheel - 50) * 0.5) + 50) * 19 + 610
+      data: (((wheelValue - 50) * 0.5) + 50) * 19 + 610
     })
-  }, [lgWheel])
+  }, [lgWheel, steeringReversed])
 
   useEffect(() => {
     let pwm = THROTTLE_NEUTRAL
@@ -157,7 +190,7 @@ function App() {
     } else {
       socket.emit('setPulseLength', {
         pin: 15,
-        data: pwm
+        data: getMotorPulse(pwm)
       })
     }
   }, [lgThrottle])
@@ -217,16 +250,27 @@ function App() {
   }
 
   const pwmChange = (pinKey, e) => {
+    const value = pinKey === 14 ? getSteeringValue(e) : e
     socket.emit('setPulseLength', {
       pin: pinKey,
-      data: e * 20 + 500
+      data: value * 20 + 500
     })
+  }
+
+  const getSteeringValue = (value) => {
+    if (!steeringReversedRef.current) return value
+    return 100 - value
+  }
+
+  const getMotorPulse = (pwm) => {
+    if (!motorReversedRef.current) return pwm
+    return THROTTLE_NEUTRAL - (pwm - THROTTLE_NEUTRAL)
   }
 
   const setThrottleNeutral = () => {
     socket.emit('setPulseLength', {
       pin: 15,
-      data: THROTTLE_NEUTRAL
+      data: getMotorPulse(THROTTLE_NEUTRAL)
     })
   }
 
@@ -245,7 +289,7 @@ function App() {
     if (gearValue.current === 'N') return
     socket.emit('setPulseLength', {
       pin: 15,
-      data: pwm
+      data: getMotorPulse(pwm)
     })
   }
 
@@ -268,8 +312,16 @@ function App() {
     if (gearValue.current === 'N') return
     socket.emit('setPulseLength', {
       pin: 15,
-      data: pwm
+      data: getMotorPulse(pwm)
     })
+  }
+
+  const toggleSteeringDirection = () => {
+    setSteeringReversed(current => !current)
+  }
+
+  const toggleMotorDirection = () => {
+    setMotorReversed(current => !current)
   }
 
   const openVideoSettings = () => {
@@ -409,6 +461,22 @@ function App() {
           onTouchCancel={onTouchEndThrottle}
         >stop</a>
         <Gear onChange={gearChange}/>
+        <div className="DriveConfig">
+          <button
+            type="button"
+            className={steeringReversed ? 'active' : ''}
+            onClick={toggleSteeringDirection}
+          >
+            舵机 {steeringReversed ? '反向' : '正向'}
+          </button>
+          <button
+            type="button"
+            className={motorReversed ? 'active' : ''}
+            onClick={toggleMotorDirection}
+          >
+            电机 {motorReversed ? '反向' : '正向'}
+          </button>
+        </div>
         <Direction onChange={e => pwmChange(14, 100 - e)}/>
       </div>
       <br />
