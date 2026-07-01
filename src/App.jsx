@@ -107,10 +107,18 @@ function App() {
     dropped: 0,
     status: 'connecting',
   })
+  const [wifiStatus, setWifiStatus] = useState({})
   const decoderPreference = new URLSearchParams(window.location.search).get('decoder') || 'auto'
   const videoMode = videoColor === 'color'
     ? 0
     : videoProfile === 'custom' ? 1 : 2
+  const wifiText = wifiStatus.error
+    ? 'WiFi 异常'
+    : wifiStatus.connected === false
+      ? 'WiFi 未连接'
+      : wifiStatus.ssid
+        ? `WiFi ${wifiStatus.ssid}${wifiStatus.signal ? ` ${wifiStatus.signal}dBm` : ''}`
+        : 'WiFi --'
 
   const lgInit = () => {
     setInterval(() => {
@@ -204,6 +212,24 @@ function App() {
 
     return () => {
       videoPlayer.current?.destroy()
+    }
+  }, [])
+
+  useEffect(() => {
+    const updateWifiStatus = (status = {}) => {
+      setWifiStatus(status)
+    }
+    const requestWifiStatus = () => {
+      socket.emit('wifi:status:get')
+    }
+
+    socket.on('wifi:status', updateWifiStatus)
+    requestWifiStatus()
+    const timer = setInterval(requestWifiStatus, 10000)
+
+    return () => {
+      socket.off('wifi:status', updateWifiStatus)
+      clearInterval(timer)
     }
   }, [])
 
@@ -420,6 +446,16 @@ function App() {
           <span>queue {videoStats.queue}</span>
           <span>drop {videoStats.dropped}</span>
           <span>{videoStats.status}</span>
+          <span
+            className={[
+              'WifiStatus',
+              wifiStatus.error || wifiStatus.connected === false ? 'warn' : '',
+              wifiStatus.ssid ? 'online' : '',
+            ].filter(Boolean).join(' ')}
+            title={wifiStatus.error || ''}
+          >
+            {wifiText}
+          </span>
         </div>
       </div>
       <VideoSettingsModal

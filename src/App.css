@@ -57,6 +57,12 @@ body,
     justify-content: flex-start;
     opacity: 0.85;
 }
+.WifiStatus.online {
+    color: #acf9fb;
+}
+.WifiStatus.warn {
+    color: #ffb37a;
+}
 .VideoSettingsOpen {
     overflow: hidden;
 }
