@@ -63,6 +63,10 @@ function VideoSettingsModal({
   onReset,
   onSelectProfile,
   onSelectColor,
+  steeringReversed,
+  motorReversed,
+  onToggleSteeringDirection,
+  onToggleMotorDirection,
 }) {
   useEffect(() => {
     if (!open) return undefined
@@ -95,18 +99,18 @@ function VideoSettingsModal({
         className="VideoSettingsDialog"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="video-settings-title"
+        aria-labelledby="settings-title"
         onMouseDown={event => event.stopPropagation()}
       >
         <header className="VideoSettingsHeader">
           <div>
-            <h2 id="video-settings-title">图传设置</h2>
-            <p>调整自定义模式，应用时会短暂切流</p>
+            <h2 id="settings-title">设置</h2>
+            <p>调整图传参数和底盘方向</p>
           </div>
           <button
             className="VideoSettingsClose"
             type="button"
-            aria-label="关闭图传设置"
+            aria-label="关闭设置"
             onClick={onClose}
           >
             ×
@@ -259,6 +263,38 @@ function VideoSettingsModal({
                 disabled={value.blackWhite}
                 onChange={nextValue => update('saturation', nextValue)}
               />
+            </section>
+
+            <section className="TuningSection">
+              <h3 className="TuningSectionTitle">底盘方向</h3>
+
+              <button
+                className="MonochromeSwitch"
+                type="button"
+                role="switch"
+                aria-checked={steeringReversed}
+                onClick={onToggleSteeringDirection}
+              >
+                <span>
+                  <strong>舵机方向</strong>
+                  <small>{steeringReversed ? '当前为反向' : '当前为正向'}</small>
+                </span>
+                <i aria-hidden="true"><b /></i>
+              </button>
+
+              <button
+                className="MonochromeSwitch"
+                type="button"
+                role="switch"
+                aria-checked={motorReversed}
+                onClick={onToggleMotorDirection}
+              >
+                <span>
+                  <strong>电机方向</strong>
+                  <small>{motorReversed ? '当前为反向' : '当前为正向'}</small>
+                </span>
+                <i aria-hidden="true"><b /></i>
+              </button>
             </section>
           </div>
         </div>

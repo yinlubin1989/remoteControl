@@ -992,29 +992,6 @@ body,
     position: absolute;
     top: 105px
 }
-.DriveConfig {
-    position: absolute;
-    left: 38vw;
-    top: 16px;
-    display: flex;
-    gap: 8px;
-}
-.DriveConfig button {
-    appearance: none;
-    width: 82px;
-    height: 30px;
-    color: rgba(172, 249, 251, 0.86);
-    background: rgba(4, 18, 24, 0.74);
-    border: 1px solid rgba(172, 249, 251, 0.58);
-    border-radius: 3px;
-    font-size: 11px;
-    line-height: 28px;
-    text-align: center;
-}
-.DriveConfig button.active {
-    color: #041218;
-    background: rgba(172, 249, 251, 0.96);
-}
 .SpeedSlider {
     left: 3vw;
     top: 0;

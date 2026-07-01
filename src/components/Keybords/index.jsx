@@ -41,7 +41,7 @@ const Main = ({
         {isFullScreen ? '退出全屏' : '全屏'}
       </a>
       <a onClick={openVideoSettings}>
-        图传设置
+        设置
       </a>
       <VoiceControls socket={socket} />
     </div>

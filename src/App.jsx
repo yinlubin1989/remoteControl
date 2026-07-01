@@ -434,6 +434,10 @@ function App() {
         onReset={() => setDraftSettings({ ...DEFAULT_CUSTOM_SETTINGS })}
         onSelectProfile={setVideoProfile}
         onSelectColor={selectVideoColor}
+        steeringReversed={steeringReversed}
+        motorReversed={motorReversed}
+        onToggleSteeringDirection={toggleSteeringDirection}
+        onToggleMotorDirection={toggleMotorDirection}
       />
       <Keybords
         socket={socket}
@@ -461,22 +465,6 @@ function App() {
           onTouchCancel={onTouchEndThrottle}
         >stop</a>
         <Gear onChange={gearChange}/>
-        <div className="DriveConfig">
-          <button
-            type="button"
-            className={steeringReversed ? 'active' : ''}
-            onClick={toggleSteeringDirection}
-          >
-            舵机 {steeringReversed ? '反向' : '正向'}
-          </button>
-          <button
-            type="button"
-            className={motorReversed ? 'active' : ''}
-            onClick={toggleMotorDirection}
-          >
-            电机 {motorReversed ? '反向' : '正向'}
-          </button>
-        </div>
         <Direction onChange={e => pwmChange(14, 100 - e)}/>
       </div>
       <br />
