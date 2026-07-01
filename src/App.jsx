@@ -47,10 +47,22 @@ const THROTTLE_NEUTRAL = 1500
 const BRAKE_PWM_OFFSET = 300
 const STEERING_DIRECTION_KEY = 'steering-direction'
 const MOTOR_DIRECTION_KEY = 'motor-direction'
+const DECODER_STORAGE_KEY = 'video-decoder'
+const VALID_DECODERS = ['webcodecs', 'broadway']
 
 const loadDirectionSetting = (key) => (
   window.localStorage.getItem(key) === 'reverse'
 )
+
+const loadVideoDecoder = () => {
+  const queryDecoder = new URLSearchParams(window.location.search).get('decoder')
+  if (VALID_DECODERS.includes(queryDecoder)) {
+    return queryDecoder
+  }
+
+  const savedDecoder = window.localStorage.getItem(DECODER_STORAGE_KEY)
+  return VALID_DECODERS.includes(savedDecoder) ? savedDecoder : 'webcodecs'
+}
 
 socket.on("connect", () => {
   socket.emit('setPulseLength', {
@@ -108,7 +120,7 @@ function App() {
     status: 'connecting',
   })
   const [wifiStatus, setWifiStatus] = useState({})
-  const decoderPreference = new URLSearchParams(window.location.search).get('decoder') || 'auto'
+  const [videoDecoder, setVideoDecoder] = useState(loadVideoDecoder)
   const videoMode = videoColor === 'color'
     ? 0
     : videoProfile === 'custom' ? 1 : 2
@@ -243,7 +255,7 @@ function App() {
       profile: videoProfile,
       mode: videoMode,
       customSettings,
-      decoderPreference,
+      decoderPreference: videoDecoder,
       onStats: setVideoStats,
     })
     videoPlayer.current.start()
@@ -251,7 +263,7 @@ function App() {
     return () => {
       videoPlayer.current?.destroy()
     }
-  }, [videoProfile, videoMode, customSettings])
+  }, [videoProfile, videoMode, customSettings, videoDecoder])
 
   const initKeyBoard = () => {
     window.addEventListener('keydown', (e) => {
@@ -377,6 +389,14 @@ function App() {
     }))
   }
 
+  const selectVideoDecoder = decoder => {
+    if (!VALID_DECODERS.includes(decoder)) {
+      return
+    }
+    window.localStorage.setItem(DECODER_STORAGE_KEY, decoder)
+    setVideoDecoder(decoder)
+  }
+
   const limitChange = (e) => {
     setIsLimit(e)
   }
@@ -470,6 +490,8 @@ function App() {
         onReset={() => setDraftSettings({ ...DEFAULT_CUSTOM_SETTINGS })}
         onSelectProfile={setVideoProfile}
         onSelectColor={selectVideoColor}
+        activeDecoder={videoDecoder}
+        onSelectDecoder={selectVideoDecoder}
         steeringReversed={steeringReversed}
         motorReversed={motorReversed}
         onToggleSteeringDirection={toggleSteeringDirection}

@@ -87,7 +87,7 @@ export default class LowLatencyVideoPlayer {
     profile,
     mode = 2,
     customSettings,
-    decoderPreference = 'auto',
+    decoderPreference = 'webcodecs',
     onStats,
   }) {
     this.container = container
@@ -105,9 +105,7 @@ export default class LowLatencyVideoPlayer {
     this.canvas = null
     this.context = null
     this.awaitingKeyframe = true
-    this.fallbackStarted = false
     this.renderedInWindow = 0
-    this.underperformingSeconds = 0
     this.statsTimer = null
     this.destroyed = false
   }
@@ -120,20 +118,6 @@ export default class LowLatencyVideoPlayer {
       this.stats.fps = renderedFps
       this.renderedInWindow = 0
       this.emitStats()
-
-      if (
-        this.decoderPreference === 'auto'
-        && this.stats.decoder === 'WebCodecs'
-      ) {
-        const minimumFps = Math.max(10, Math.floor(this.targetFps * 0.75))
-        this.underperformingSeconds = renderedFps < minimumFps
-          ? this.underperformingSeconds + 1
-          : 0
-
-        if (this.underperformingSeconds >= 3) {
-          this.startBroadway(`WebCodecs too slow: ${renderedFps} fps`)
-        }
-      }
     }, 1000)
 
     if (this.decoderPreference === 'broadway') {
@@ -142,7 +126,10 @@ export default class LowLatencyVideoPlayer {
     }
 
     if (!('VideoDecoder' in window) || !('EncodedVideoChunk' in window)) {
-      this.startBroadway('WebCodecs unavailable')
+      this.updateStats({
+        decoder: 'WebCodecs',
+        status: 'unsupported: WebCodecs unavailable',
+      })
       return
     }
 
@@ -212,7 +199,7 @@ export default class LowLatencyVideoPlayer {
 
     this.decoder = new VideoDecoder({
       output: frame => this.renderFrame(frame),
-      error: error => this.startBroadway(`WebCodecs error: ${error.message}`),
+      error: error => this.handleWebCodecsError(`WebCodecs error: ${error.message}`),
     })
 
     this.webSocket = new WebSocket(socketUrl())
@@ -228,19 +215,28 @@ export default class LowLatencyVideoPlayer {
       this.decodeAccessUnit(toUint8Array(event.data))
     })
     this.webSocket.addEventListener('close', () => {
-      if (!this.destroyed && !this.fallbackStarted) {
+      if (!this.destroyed) {
         this.updateStats({ status: 'disconnected' })
       }
     })
     this.webSocket.addEventListener('error', () => {
-      this.startBroadway('WebSocket error')
+      this.handleWebCodecsError('WebSocket error')
+    })
+  }
+
+  handleWebCodecsError(reason) {
+    if (this.destroyed) {
+      return
+    }
+    this.updateStats({
+      decoder: 'WebCodecs',
+      status: `error: ${reason}`,
     })
   }
 
   async configureDecoder(codec) {
     if (
       this.destroyed
-      || this.fallbackStarted
       || (this.decoderConfig && this.decoderConfig.codec === codec)
     ) {
       return Boolean(this.decoderConfig)
@@ -254,7 +250,7 @@ export default class LowLatencyVideoPlayer {
 
     try {
       const support = await VideoDecoder.isConfigSupported(config)
-      if (!support.supported || this.destroyed || this.fallbackStarted) {
+      if (!support.supported || this.destroyed) {
         throw new Error(`${codec} is not supported`)
       }
 
@@ -263,7 +259,10 @@ export default class LowLatencyVideoPlayer {
       this.awaitingKeyframe = true
       return true
     } catch (error) {
-      this.startBroadway(`WebCodecs unsupported: ${error.message}`)
+      this.updateStats({
+        decoder: 'WebCodecs',
+        status: `unsupported: ${error.message}`,
+      })
       return false
     }
   }
@@ -282,7 +281,6 @@ export default class LowLatencyVideoPlayer {
   async decodeAccessUnit(data) {
     if (
       this.destroyed
-      || this.fallbackStarted
       || !this.decoder
       || this.decoder.state === 'closed'
     ) {
@@ -328,7 +326,7 @@ export default class LowLatencyVideoPlayer {
       }))
       this.stats.queue = this.decoder.decodeQueueSize
     } catch (error) {
-      this.startBroadway(`Decode failed: ${error.message}`)
+      this.handleWebCodecsError(`Decode failed: ${error.message}`)
     }
   }
 
@@ -349,10 +347,9 @@ export default class LowLatencyVideoPlayer {
   }
 
   startBroadway(reason = '') {
-    if (this.destroyed || this.fallbackStarted) {
+    if (this.destroyed) {
       return
     }
-    this.fallbackStarted = true
     this.closeWebCodecs()
     this.container.innerHTML = ''
 
@@ -369,7 +366,7 @@ export default class LowLatencyVideoPlayer {
       this.updateStats({
         decoder: 'Broadway Worker',
         queue: 0,
-        status: reason ? `fallback: ${reason}` : 'connected',
+        status: reason || 'connected',
       })
     })
     this.broadway.ws.addEventListener('message', event => {

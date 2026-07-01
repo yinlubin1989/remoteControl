@@ -14,6 +14,11 @@ const PROFILE_OPTIONS = [
   { value: 'full', label: '完整视野', detail: '15fps' },
 ]
 
+const DECODER_OPTIONS = [
+  { value: 'webcodecs', label: 'WebCodecs', detail: '原生解码' },
+  { value: 'broadway', label: 'Broadway', detail: '兼容解码' },
+]
+
 const aspectRatio = {
   '4:3': 3 / 4,
   '16:9': 9 / 16,
@@ -63,6 +68,8 @@ function VideoSettingsModal({
   onReset,
   onSelectProfile,
   onSelectColor,
+  activeDecoder,
+  onSelectDecoder,
   steeringReversed,
   motorReversed,
   onToggleSteeringDirection,
@@ -163,6 +170,22 @@ function VideoSettingsModal({
                 >
                   黑白
                 </button>
+              </div>
+            </div>
+            <div className="VideoQuickGroup">
+              <span className="VideoQuickLabel">解码器</span>
+              <div className="VideoQuickOptions">
+                {DECODER_OPTIONS.map(option => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={activeDecoder === option.value ? 'active' : ''}
+                    onClick={() => onSelectDecoder(option.value)}
+                  >
+                    <strong>{option.label}</strong>
+                    <small>{option.detail}</small>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
