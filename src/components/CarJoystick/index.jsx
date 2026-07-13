@@ -2,31 +2,37 @@ import { useEffect, useRef, useState } from 'react'
 import './index.css'
 
 const CENTER = 50
+const GESTURE_TO_JOYSTICK_RATIO = 0.5
 
 const CarJoystick = ({ onChange }) => {
   const controlRef = useRef(null)
   const activePointerRef = useRef(null)
+  const gestureStartRef = useRef(null)
   const [position, setPosition] = useState({ x: CENTER, y: CENTER })
   const [active, setActive] = useState(false)
 
   const updatePosition = (clientX, clientY) => {
     const bounds = controlRef.current?.getBoundingClientRect()
-    if (!bounds) return
+    const gestureStart = gestureStartRef.current
+    if (!bounds || !gestureStart) return
 
-    const radius = bounds.width / 2
-    let offsetX = clientX - (bounds.left + radius)
-    let offsetY = clientY - (bounds.top + radius)
+    let offsetX = gestureStart.position.x - CENTER + (
+      (clientX - gestureStart.clientX) / bounds.width
+    ) * 100 * GESTURE_TO_JOYSTICK_RATIO
+    let offsetY = gestureStart.position.y - CENTER + (
+      (clientY - gestureStart.clientY) / bounds.height
+    ) * 100 * GESTURE_TO_JOYSTICK_RATIO
     const distance = Math.hypot(offsetX, offsetY)
 
-    if (distance > radius) {
-      const scale = radius / distance
+    if (distance > CENTER) {
+      const scale = CENTER / distance
       offsetX *= scale
       offsetY *= scale
     }
 
     setPosition({
-      x: CENTER + (offsetX / radius) * CENTER,
-      y: CENTER + (offsetY / radius) * CENTER,
+      x: CENTER + offsetX,
+      y: CENTER + offsetY,
     })
   }
 
@@ -37,15 +43,20 @@ const CarJoystick = ({ onChange }) => {
     ) return
 
     activePointerRef.current = null
+    gestureStartRef.current = null
     setActive(false)
     setPosition({ x: CENTER, y: CENTER })
   }
 
   const onPointerDown = (event) => {
     activePointerRef.current = event.pointerId
+    gestureStartRef.current = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      position,
+    }
     event.currentTarget.setPointerCapture(event.pointerId)
     setActive(true)
-    updatePosition(event.clientX, event.clientY)
   }
 
   const onPointerMove = (event) => {
