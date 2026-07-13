@@ -3,7 +3,13 @@ import VoiceControls from '../VoiceControls'
 import './index.css'
 
 const Main = ({
-  socket, limitChange, fullScreen, isFullScreen, openVideoSettings
+  socket,
+  limitChange,
+  fullScreen,
+  isFullScreen,
+  openVideoSettings,
+  controlMode,
+  toggleControlMode,
 }) => {
   const [b1, setB1] = useState(true);
   const [b2, setB2] = useState(true);
@@ -37,6 +43,13 @@ const Main = ({
           setB3(!b3)
         }}
       >限速</a>
+      <a
+        className="ControlModeSwitch"
+        onClick={toggleControlMode}
+        title={controlMode === 'joystick' ? '切换到分离操作' : '切换到单摇杆操作'}
+      >
+        {controlMode === 'joystick' ? '分离操作' : '单摇杆'}
+      </a>
       <a onClick={fullScreen}>
         {isFullScreen ? '退出全屏' : '全屏'}
       </a>

@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import io from 'socket.io-client'
 import LowLatencyVideoPlayer from './LowLatencyVideoPlayer'
 import CrossHandle from './components/CrossHandle'
 import SliderHandle from './components/SliderHandle'
-import DiskHandle from './components/DiskHandle'
+import CarJoystick from './components/CarJoystick'
 import Keybords from './components/Keybords'
 import Gear from './components/Gear'
 import Direction from './components/Direction'
@@ -48,6 +48,8 @@ const BRAKE_PWM_OFFSET = 300
 const STEERING_DIRECTION_KEY = 'steering-direction'
 const MOTOR_DIRECTION_KEY = 'motor-direction'
 const DECODER_STORAGE_KEY = 'video-decoder'
+const CONTROL_MODE_STORAGE_KEY = 'car-control-mode'
+const JOYSTICK_DEAD_ZONE = 4
 const VALID_DECODERS = ['webcodecs', 'broadway']
 
 const loadDirectionSetting = (key) => (
@@ -62,6 +64,17 @@ const loadVideoDecoder = () => {
 
   const savedDecoder = window.localStorage.getItem(DECODER_STORAGE_KEY)
   return VALID_DECODERS.includes(savedDecoder) ? savedDecoder : 'webcodecs'
+}
+
+const applyJoystickDeadZone = (value) => {
+  const offset = value - 50
+  const distance = Math.abs(offset)
+  if (distance <= JOYSTICK_DEAD_ZONE) return 50
+
+  const adjustedDistance = (
+    (distance - JOYSTICK_DEAD_ZONE) / (50 - JOYSTICK_DEAD_ZONE)
+  ) * 50
+  return 50 + Math.sign(offset) * adjustedDistance
 }
 
 socket.on("connect", () => {
@@ -89,6 +102,11 @@ function App() {
   const [lgWheel, setLgWheel] = useState(50)
   const [lgThrottle, setLgThrottle] = useState(0)
   const [isLimit, setIsLimit] = useState(false)
+  const [controlMode, setControlMode] = useState(() => (
+    window.localStorage.getItem(CONTROL_MODE_STORAGE_KEY) === 'joystick'
+      ? 'joystick'
+      : 'separate'
+  ))
   const [lgGear, setLgGear] = useState('D')
   const [steeringReversed, setSteeringReversed] = useState(() => (
     loadDirectionSetting(STEERING_DIRECTION_KEY)
@@ -100,6 +118,7 @@ function App() {
   const [isFullScreen, setIsFullScreen] = useState(false)
   const steeringReversedRef = useRef(steeringReversed)
   const motorReversedRef = useRef(motorReversed)
+  const controlModeRef = useRef(controlMode)
   const [videoProfile, setVideoProfile] = useState(() => {
     const savedProfile = window.localStorage.getItem('video-profile')
     return ['low', 'wide', 'clear', 'full', 'custom'].includes(savedProfile)
@@ -158,9 +177,13 @@ function App() {
     }, 20)
   }
 
-  useEffect(() => { 
+  useEffect(() => {
     gearValue.current = lgGear
   }, [lgGear])
+
+  useEffect(() => {
+    controlModeRef.current = controlMode
+  }, [controlMode])
 
   useEffect(() => {
     steeringReversedRef.current = steeringReversed
@@ -186,14 +209,16 @@ function App() {
   }, [cam])
 
   useEffect(() => {
+    if (controlMode === 'joystick') return
     const wheelValue = getSteeringValue(lgWheel)
     socket.emit('setPulseLength', {
       pin: 14,
       data: (((wheelValue - 50) * 0.5) + 50) * 19 + 610
     })
-  }, [lgWheel, steeringReversed])
+  }, [controlMode, lgWheel, steeringReversed])
 
   useEffect(() => {
+    if (controlMode === 'joystick') return
     let pwm = THROTTLE_NEUTRAL
     if (gearValue.current === 'D') {
       pwm = pwm - (lgThrottle - 50) * (isLimit ? 5 : 14)
@@ -213,7 +238,7 @@ function App() {
         data: getMotorPulse(pwm)
       })
     }
-  }, [lgThrottle])
+  }, [controlMode, lgThrottle])
 
   useEffect(() => {
     initKeyBoard()
@@ -267,6 +292,7 @@ function App() {
 
   const initKeyBoard = () => {
     window.addEventListener('keydown', (e) => {
+      if (controlModeRef.current === 'joystick') return
       if (e.key === ' ') {
         onTouchThrottle()
       }
@@ -278,6 +304,7 @@ function App() {
       }
     })
     window.addEventListener('keyup', (e) => {
+      if (controlModeRef.current === 'joystick') return
       if (e.key === ' ') {
         onTouchEndThrottle()
       }
@@ -401,6 +428,41 @@ function App() {
     setIsLimit(e)
   }
 
+  const toggleControlMode = () => {
+    setThrottleNeutral()
+    pwmChange(14, 50)
+    setControlMode(current => {
+      const nextMode = current === 'joystick' ? 'separate' : 'joystick'
+      window.localStorage.setItem(CONTROL_MODE_STORAGE_KEY, nextMode)
+      return nextMode
+    })
+  }
+
+  const handleJoystickChange = useCallback(({ x, y, active }) => {
+    if (controlMode !== 'joystick') return
+
+    const steering = applyJoystickDeadZone(x)
+    const throttle = applyJoystickDeadZone(y)
+    pwmChange(14, 100 - steering)
+    if (!active || throttle === 50) {
+      setThrottleNeutral()
+      return
+    }
+
+    const throttlePercent = Math.abs(throttle - 50) * 2
+    const pwmOffset = throttlePercent * (
+      isLimit ? (throttle < 50 ? 2.5 : 2) : 5
+    )
+    const pwm = throttle < 50
+      ? THROTTLE_NEUTRAL - pwmOffset
+      : THROTTLE_NEUTRAL + pwmOffset
+
+    socket.emit('setPulseLength', {
+      pin: 15,
+      data: getMotorPulse(pwm),
+    })
+  }, [controlMode, isLimit])
+
   const usePseudoFullscreen = isIOSDevice() || (
     new URLSearchParams(window.location.search).get('fullscreen') === 'pseudo'
   )
@@ -503,28 +565,34 @@ function App() {
         fullScreen={fullScreen}
         isFullScreen={isFullScreen}
         openVideoSettings={openVideoSettings}
+        controlMode={controlMode}
+        toggleControlMode={toggleControlMode}
       />
-      <div className="Console">
-        <SliderHandle
-          onChange={speedChange}
-          title="速度"
-          defalutValue={0}
-          width="20vw"
-          className="SpeedSlider"
-        />
-        <a className="Start"
-          onTouchStart={onTouchThrottle}
-          onTouchEnd={onTouchEndThrottle}
-          onTouchCancel={onTouchEndThrottle}
-        >油门</a>
-        <a className="Brake"
-          onTouchStart={onTouchBrake}
-          onTouchEnd={onTouchEndThrottle}
-          onTouchCancel={onTouchEndThrottle}
-        >stop</a>
-        <Gear onChange={gearChange}/>
-        <Direction onChange={e => pwmChange(14, 100 - e)}/>
-      </div>
+      {controlMode === 'joystick' ? (
+        <CarJoystick onChange={handleJoystickChange} />
+      ) : (
+        <div className="Console">
+          <SliderHandle
+            onChange={speedChange}
+            title="速度"
+            defalutValue={0}
+            width="20vw"
+            className="SpeedSlider"
+          />
+          <a className="Start"
+            onTouchStart={onTouchThrottle}
+            onTouchEnd={onTouchEndThrottle}
+            onTouchCancel={onTouchEndThrottle}
+          >油门</a>
+          <a className="Brake"
+            onTouchStart={onTouchBrake}
+            onTouchEnd={onTouchEndThrottle}
+            onTouchCancel={onTouchEndThrottle}
+          >stop</a>
+          <Gear onChange={gearChange}/>
+          <Direction onChange={e => pwmChange(14, 100 - e)}/>
+        </div>
+      )}
       <br />
       <div className="Arm">
         {/* <SliderHandle onChange={e => {}}/> */}
