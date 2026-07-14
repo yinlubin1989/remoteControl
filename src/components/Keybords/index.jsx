@@ -2,6 +2,18 @@ import { useState, useEffect, useRef } from 'react'
 import VoiceControls from '../VoiceControls'
 import './index.css'
 
+const CONTROL_MODE_LABELS = {
+  separate: '分离',
+  joystick: '摇杆',
+  cockpit: '驾驶舱',
+}
+
+const NEXT_CONTROL_MODE = {
+  separate: 'joystick',
+  joystick: 'cockpit',
+  cockpit: 'separate',
+}
+
 const Main = ({
   socket,
   limitChange,
@@ -46,9 +58,9 @@ const Main = ({
       <a
         className="ControlModeSwitch"
         onClick={toggleControlMode}
-        title={controlMode === 'joystick' ? '切换到分离操作' : '切换到单摇杆操作'}
+        title={`切换到${CONTROL_MODE_LABELS[NEXT_CONTROL_MODE[controlMode]]}模式`}
       >
-        {controlMode === 'joystick' ? '分离操作' : '单摇杆'}
+        模式·{CONTROL_MODE_LABELS[controlMode]}
       </a>
       <a onClick={fullScreen}>
         {isFullScreen ? '退出全屏' : '全屏'}

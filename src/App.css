@@ -1002,3 +1002,104 @@ body,
     left: 3vw;
     top: 0;
 }
+
+/* Landscape high-speed cockpit */
+.App.cockpitMode,
+.App.cockpitMode.pseudoFullScreen {
+    position: fixed;
+    inset: 0;
+    width: 100dvw;
+    height: 100dvh;
+    overflow: hidden;
+    background: #000;
+    z-index: 190000;
+}
+
+.cockpitMode #screen,
+.cockpitMode #screen.FullFrame,
+.cockpitMode.pseudoFullScreen #screen {
+    position: fixed;
+    inset: 0;
+    z-index: 190001;
+    display: grid;
+    place-items: center;
+    width: 100dvw;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    background: #000;
+}
+
+.cockpitMode #screen canvas,
+.cockpitMode #screen.FullFrame canvas,
+.cockpitMode.fullScreen #screen canvas,
+.cockpitMode.fullScreen #screen.FullFrame canvas,
+.cockpitMode.pseudoFullScreen #screen canvas,
+.cockpitMode.pseudoFullScreen #screen.FullFrame canvas {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100dvw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    transform: translate(-50%, -50%);
+    object-fit: cover;
+}
+
+.cockpitMode .VideoPanel {
+    display: none;
+}
+
+.cockpitMode .Keyboards,
+.cockpitMode.fullScreen .Keyboards,
+.cockpitMode.pseudoFullScreen .Keyboards {
+    position: fixed;
+    z-index: 190015;
+    left: 50%;
+    right: auto;
+    top: max(7px, env(safe-area-inset-top));
+    bottom: auto;
+    display: flex;
+    width: auto;
+    max-width: calc(100dvw - 32px);
+    margin: 0;
+    padding: 4px 6px;
+    gap: 4px;
+    overflow: visible;
+    transform: translateX(-50%);
+    transform-origin: center;
+    flex-wrap: nowrap;
+    background: rgba(3, 15, 20, 0.68);
+    border: 1px solid rgba(172, 249, 251, 0.14);
+    border-radius: 5px;
+    backdrop-filter: blur(6px);
+}
+
+.cockpitMode .Keyboards a {
+    width: auto;
+    min-width: 42px;
+    height: 28px;
+    padding: 0 7px;
+    line-height: 26px;
+    background: rgba(4, 18, 24, 0.72);
+}
+
+.cockpitMode .Keyboards a.ControlModeSwitch {
+    min-width: 82px;
+    color: #041218;
+    background: #acf9fb;
+}
+
+@media (max-height: 390px) and (orientation: landscape) {
+    .cockpitMode .Keyboards,
+    .cockpitMode.fullScreen .Keyboards,
+    .cockpitMode.pseudoFullScreen .Keyboards {
+        top: 5px;
+    }
+    .cockpitMode .Keyboards a {
+        height: 26px;
+        line-height: 24px;
+    }
+}

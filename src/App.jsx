@@ -4,6 +4,8 @@ import LowLatencyVideoPlayer from './LowLatencyVideoPlayer'
 import CrossHandle from './components/CrossHandle'
 import SliderHandle from './components/SliderHandle'
 import CarJoystick from './components/CarJoystick'
+import CockpitControls from './components/CockpitControls'
+import { applyCockpitSteeringCurve } from './components/CockpitControls/controlMath'
 import Keybords from './components/Keybords'
 import Gear from './components/Gear'
 import Direction from './components/Direction'
@@ -51,6 +53,7 @@ const DECODER_STORAGE_KEY = 'video-decoder'
 const CONTROL_MODE_STORAGE_KEY = 'car-control-mode'
 const JOYSTICK_DEAD_ZONE = 4
 const VALID_DECODERS = ['webcodecs', 'broadway']
+const VALID_CONTROL_MODES = ['separate', 'joystick', 'cockpit']
 
 const loadDirectionSetting = (key) => (
   window.localStorage.getItem(key) === 'reverse'
@@ -102,11 +105,10 @@ function App() {
   const [lgWheel, setLgWheel] = useState(50)
   const [lgThrottle, setLgThrottle] = useState(0)
   const [isLimit, setIsLimit] = useState(false)
-  const [controlMode, setControlMode] = useState(() => (
-    window.localStorage.getItem(CONTROL_MODE_STORAGE_KEY) === 'joystick'
-      ? 'joystick'
-      : 'separate'
-  ))
+  const [controlMode, setControlMode] = useState(() => {
+    const savedMode = window.localStorage.getItem(CONTROL_MODE_STORAGE_KEY)
+    return VALID_CONTROL_MODES.includes(savedMode) ? savedMode : 'separate'
+  })
   const [lgGear, setLgGear] = useState('D')
   const [steeringReversed, setSteeringReversed] = useState(() => (
     loadDirectionSetting(STEERING_DIRECTION_KEY)
@@ -119,6 +121,7 @@ function App() {
   const steeringReversedRef = useRef(steeringReversed)
   const motorReversedRef = useRef(motorReversed)
   const controlModeRef = useRef(controlMode)
+  const cockpitTravelDirectionRef = useRef('D')
   const [videoProfile, setVideoProfile] = useState(() => {
     const savedProfile = window.localStorage.getItem('video-profile')
     return ['low', 'wide', 'clear', 'full', 'custom'].includes(savedProfile)
@@ -209,7 +212,7 @@ function App() {
   }, [cam])
 
   useEffect(() => {
-    if (controlMode === 'joystick') return
+    if (controlMode !== 'separate') return
     const wheelValue = getSteeringValue(lgWheel)
     socket.emit('setPulseLength', {
       pin: 14,
@@ -218,7 +221,7 @@ function App() {
   }, [controlMode, lgWheel, steeringReversed])
 
   useEffect(() => {
-    if (controlMode === 'joystick') return
+    if (controlMode !== 'separate') return
     let pwm = THROTTLE_NEUTRAL
     if (gearValue.current === 'D') {
       pwm = pwm - (lgThrottle - 50) * (isLimit ? 5 : 14)
@@ -292,7 +295,7 @@ function App() {
 
   const initKeyBoard = () => {
     window.addEventListener('keydown', (e) => {
-      if (controlModeRef.current === 'joystick') return
+      if (controlModeRef.current !== 'separate') return
       if (e.key === ' ') {
         onTouchThrottle()
       }
@@ -304,7 +307,7 @@ function App() {
       }
     })
     window.addEventListener('keyup', (e) => {
-      if (controlModeRef.current === 'joystick') return
+      if (controlModeRef.current !== 'separate') return
       if (e.key === ' ') {
         onTouchEndThrottle()
       }
@@ -429,10 +432,12 @@ function App() {
   }
 
   const toggleControlMode = () => {
-    setThrottleNeutral()
-    pwmChange(14, 50)
+    neutralizeCockpit()
     setControlMode(current => {
-      const nextMode = current === 'joystick' ? 'separate' : 'joystick'
+      const currentIndex = VALID_CONTROL_MODES.indexOf(current)
+      const nextMode = VALID_CONTROL_MODES[
+        (currentIndex + 1) % VALID_CONTROL_MODES.length
+      ]
       window.localStorage.setItem(CONTROL_MODE_STORAGE_KEY, nextMode)
       return nextMode
     })
@@ -462,6 +467,100 @@ function App() {
       data: getMotorPulse(pwm),
     })
   }, [controlMode, isLimit])
+
+  const neutralizeCockpit = useCallback(() => {
+    socket.emit('setPulseLength', {
+      pin: 15,
+      data: THROTTLE_NEUTRAL,
+    })
+    socket.emit('setPulseLength', {
+      pin: 14,
+      data: 1500,
+    })
+  }, [])
+
+  const handleCockpitSteeringChange = useCallback((value, active) => {
+    if (controlMode !== 'cockpit') return
+    if (!active) {
+      pwmChange(14, 50)
+      return
+    }
+
+    const steering = applyCockpitSteeringCurve(value)
+    pwmChange(14, 100 - steering)
+  }, [controlMode])
+
+  const handleCockpitThrottleChange = useCallback((value, active) => {
+    if (controlMode !== 'cockpit') return
+
+    const throttle = applyJoystickDeadZone(value)
+    if (!active || throttle === 50) {
+      setThrottleNeutral()
+      return
+    }
+
+    cockpitTravelDirectionRef.current = throttle < 50 ? 'D' : 'R'
+    const throttlePercent = Math.abs(throttle - 50) * 2
+    const pwmOffset = throttlePercent * (
+      isLimit ? (throttle < 50 ? 2.5 : 2) : 5
+    )
+    const pwm = throttle < 50
+      ? THROTTLE_NEUTRAL - pwmOffset
+      : THROTTLE_NEUTRAL + pwmOffset
+
+    socket.emit('setPulseLength', {
+      pin: 15,
+      data: getMotorPulse(pwm),
+    })
+  }, [controlMode, isLimit])
+
+  const handleCockpitBrake = useCallback(active => {
+    if (controlMode !== 'cockpit') return
+    if (!active) {
+      setThrottleNeutral()
+      return
+    }
+
+    const pwm = cockpitTravelDirectionRef.current === 'R'
+      ? THROTTLE_NEUTRAL - BRAKE_PWM_OFFSET
+      : THROTTLE_NEUTRAL + BRAKE_PWM_OFFSET
+    socket.emit('setPulseLength', {
+      pin: 15,
+      data: getMotorPulse(pwm),
+    })
+  }, [controlMode])
+
+  useEffect(() => {
+    if (controlMode !== 'cockpit') return undefined
+
+    const landscapeMedia = window.matchMedia('(orientation: landscape)')
+    const stopForOrientation = event => {
+      if (!event.matches) neutralizeCockpit()
+    }
+    const stopForVisibility = () => {
+      if (document.hidden) neutralizeCockpit()
+    }
+
+    window.addEventListener('blur', neutralizeCockpit)
+    document.addEventListener('visibilitychange', stopForVisibility)
+    if (landscapeMedia.addEventListener) {
+      landscapeMedia.addEventListener('change', stopForOrientation)
+    } else {
+      landscapeMedia.addListener(stopForOrientation)
+    }
+    if (!landscapeMedia.matches) neutralizeCockpit()
+
+    return () => {
+      window.removeEventListener('blur', neutralizeCockpit)
+      document.removeEventListener('visibilitychange', stopForVisibility)
+      if (landscapeMedia.removeEventListener) {
+        landscapeMedia.removeEventListener('change', stopForOrientation)
+      } else {
+        landscapeMedia.removeListener(stopForOrientation)
+      }
+      neutralizeCockpit()
+    }
+  }, [controlMode, neutralizeCockpit])
 
   const usePseudoFullscreen = isIOSDevice() || (
     new URLSearchParams(window.location.search).get('fullscreen') === 'pseudo'
@@ -514,6 +613,7 @@ function App() {
         'App',
         isFullScreen ? 'fullScreen' : '',
         isFullScreen && usePseudoFullscreen ? 'pseudoFullScreen' : '',
+        controlMode === 'cockpit' ? 'cockpitMode' : '',
       ].filter(Boolean).join(' ')}
     >
       <div
@@ -570,6 +670,17 @@ function App() {
       />
       {controlMode === 'joystick' ? (
         <CarJoystick onChange={handleJoystickChange} />
+      ) : controlMode === 'cockpit' ? (
+        <CockpitControls
+          onSteeringChange={handleCockpitSteeringChange}
+          onThrottleChange={handleCockpitThrottleChange}
+          onBrake={handleCockpitBrake}
+          isLimit={isLimit}
+          wifiText={wifiText}
+          wifiWarning={Boolean(wifiStatus.error || wifiStatus.connected === false)}
+          videoStats={videoStats}
+          onExitCockpit={toggleControlMode}
+        />
       ) : (
         <div className="Console">
           <SliderHandle
@@ -593,15 +704,16 @@ function App() {
           <Direction onChange={e => pwmChange(14, 100 - e)}/>
         </div>
       )}
-      <br />
-      <div className="Arm">
-        {/* <SliderHandle onChange={e => {}}/> */}
-        <CrossHandle onChange={e => {
-          pwmChange(13, e.armX)
-        }}/>
-        {/* <DiskHandle onChange={e => armChange(e, 1, 2)}/>
-        <SliderHandle onChange={e => {}}/> */}
-      </div>
+      {controlMode !== 'cockpit' && (
+        <>
+          <br />
+          <div className="Arm">
+            <CrossHandle onChange={e => {
+              pwmChange(13, e.armX)
+            }}/>
+          </div>
+        </>
+      )}
     </div>
   )
 }

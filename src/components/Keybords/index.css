@@ -27,7 +27,7 @@
 }
 .Keyboards a.ControlModeSwitch {
     width: auto;
-    min-width: 58px;
+    min-width: 72px;
     color: rgb(13, 14, 27);
     background: #acf9fb;
     font-weight: 700;
