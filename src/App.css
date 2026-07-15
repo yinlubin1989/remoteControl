@@ -737,6 +737,164 @@ body,
     margin-bottom: 14px;
     padding: 9px 10px;
 }
+.WifiSwitchSection {
+    position: relative;
+    overflow: hidden;
+}
+.WifiSwitchSection::after {
+    content: "";
+    position: absolute;
+    right: -28px;
+    bottom: -28px;
+    width: 92px;
+    height: 92px;
+    border: 1px solid rgba(172, 249, 251, 0.08);
+    border-radius: 50%;
+    box-shadow: 0 0 0 16px rgba(172, 249, 251, 0.025);
+    pointer-events: none;
+}
+.WifiSwitchHeading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.WifiSwitchHeading .TuningSectionTitle {
+    margin-bottom: 14px;
+}
+.WifiSwitchHeading > span {
+    margin: 0 0 14px;
+    color: #78a3a9;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 8px;
+    letter-spacing: 0.12em;
+}
+.WifiSwitchHeading > span::before {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-right: 5px;
+    border-radius: 50%;
+    background: #54f0b0;
+    box-shadow: 0 0 8px rgba(84, 240, 176, 0.75);
+}
+.WifiNetworkList {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 6px;
+}
+.WifiNetworkOption {
+    appearance: none;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 46px;
+    padding: 7px 8px;
+    color: #b8d7db;
+    text-align: left;
+    background: rgba(2, 13, 17, 0.52);
+    border: 1px solid rgba(172, 249, 251, 0.12);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+.WifiNetworkOption:not(:disabled):hover {
+    transform: translateX(2px);
+    background: rgba(172, 249, 251, 0.08);
+    border-color: rgba(172, 249, 251, 0.45);
+}
+.WifiNetworkOption.current {
+    color: #eaffff;
+    background: linear-gradient(90deg, rgba(31, 143, 147, 0.26), rgba(7, 29, 36, 0.7));
+    border-color: rgba(172, 249, 251, 0.42);
+}
+.WifiNetworkOption.unavailable {
+    opacity: 0.42;
+}
+.WifiNetworkOption.switching {
+    border-color: #f7c867;
+    animation: wifi-switch-pulse 900ms ease-in-out infinite alternate;
+}
+.WifiNetworkOption:disabled {
+    cursor: default;
+}
+.WifiNetworkRank {
+    color: #5e858c;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 9px;
+}
+.WifiNetworkName {
+    min-width: 0;
+}
+.WifiNetworkName strong,
+.WifiNetworkName small {
+    display: block;
+}
+.WifiNetworkName strong {
+    overflow: hidden;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.WifiNetworkName small {
+    margin-top: 3px;
+    color: #688d94;
+    font-size: 8px;
+}
+.WifiNetworkAction {
+    color: var(--tuning-cyan);
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 8px;
+}
+.WifiNetworkLoading,
+.WifiNetworkError {
+    min-height: 52px;
+    display: grid;
+    place-items: center;
+    padding: 10px;
+    color: #71969d;
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px dashed rgba(172, 249, 251, 0.16);
+    font-size: 9px;
+}
+.WifiNetworkError {
+    color: #ff9f8d;
+    border-color: rgba(255, 128, 105, 0.25);
+}
+.WifiSwitchMessage,
+.WifiSwitchWarning {
+    position: relative;
+    z-index: 1;
+    margin: 10px 0 0;
+    font-size: 8px;
+    line-height: 1.5;
+}
+.WifiSwitchMessage {
+    padding: 7px 8px;
+    color: #f7c867;
+    background: rgba(247, 200, 103, 0.08);
+    border-left: 2px solid #f7c867;
+}
+.WifiSwitchMessage.connected {
+    color: #68efb6;
+    border-left-color: #68efb6;
+}
+.WifiSwitchMessage.error,
+.WifiSwitchMessage.restored {
+    color: #ff9f8d;
+    border-left-color: #ff8069;
+}
+.WifiSwitchWarning {
+    color: #65888e;
+}
+@keyframes wifi-switch-pulse {
+    from { box-shadow: 0 0 0 rgba(247, 200, 103, 0); }
+    to { box-shadow: 0 0 16px rgba(247, 200, 103, 0.2); }
+}
 .VideoSettingsFooter {
     position: relative;
     z-index: 2;

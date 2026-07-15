@@ -171,6 +171,15 @@ function App() {
     status: 'connecting',
   })
   const [wifiStatus, setWifiStatus] = useState({})
+  const [wifiNetworks, setWifiNetworks] = useState({
+    networks: [],
+    loading: false,
+    error: '',
+  })
+  const [wifiSwitchState, setWifiSwitchState] = useState({
+    status: 'idle',
+    message: '',
+  })
   const [videoDecoder, setVideoDecoder] = useState(loadVideoDecoder)
   const videoMode = videoColor === 'color'
     ? 0
@@ -297,16 +306,32 @@ function App() {
     const updateWifiStatus = (status = {}) => {
       setWifiStatus(status)
     }
+    const updateWifiNetworks = (payload = {}) => {
+      setWifiNetworks({
+        networks: Array.isArray(payload.networks) ? payload.networks : [],
+        loading: false,
+        error: payload.error || '',
+      })
+    }
+    const updateWifiSwitchState = (state = {}) => {
+      setWifiSwitchState(state)
+    }
     const requestWifiStatus = () => {
       socket.emit('wifi:status:get')
     }
 
     socket.on('wifi:status', updateWifiStatus)
+    socket.on('wifi:networks', updateWifiNetworks)
+    socket.on('wifi:switch:state', updateWifiSwitchState)
+    socket.on('connect', requestWifiStatus)
     requestWifiStatus()
     const timer = setInterval(requestWifiStatus, 10000)
 
     return () => {
       socket.off('wifi:status', updateWifiStatus)
+      socket.off('wifi:networks', updateWifiNetworks)
+      socket.off('wifi:switch:state', updateWifiSwitchState)
+      socket.off('connect', requestWifiStatus)
       clearInterval(timer)
     }
   }, [])
@@ -446,7 +471,30 @@ function App() {
       ...customSettings,
       blackWhite: videoColor === 'bw',
     })
+    setWifiNetworks(current => ({
+      ...current,
+      loading: true,
+      error: '',
+    }))
+    socket.emit('wifi:networks:get')
     setSettingsOpen(true)
+  }
+
+  const switchWifiNetwork = (ssid) => {
+    const target = wifiNetworks.networks.find(network => network.ssid === ssid)
+    if (!target || target.current || !target.available) return
+
+    const confirmed = window.confirm(
+      `切换到 ${ssid}？\n\n小车会立即进入失联保护，控制连接将短暂中断。`,
+    )
+    if (!confirmed) return
+
+    setWifiSwitchState({
+      status: 'requesting',
+      requestedSsid: ssid,
+      message: `正在确认 ${ssid} 是否可连接`,
+    })
+    socket.emit('wifi:switch', { ssid })
   }
 
   const applyVideoSettings = () => {
@@ -712,6 +760,9 @@ function App() {
         onSteeringCenterChange={setSteeringCenter}
         onToggleSteeringDirection={toggleSteeringDirection}
         onToggleMotorDirection={toggleMotorDirection}
+        wifiNetworks={wifiNetworks}
+        wifiSwitchState={wifiSwitchState}
+        onSwitchWifi={switchWifiNetwork}
       />
       <Keybords
         socket={socket}

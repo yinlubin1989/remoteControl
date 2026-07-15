@@ -76,6 +76,9 @@ function VideoSettingsModal({
   onSteeringCenterChange,
   onToggleSteeringDirection,
   onToggleMotorDirection,
+  wifiNetworks,
+  wifiSwitchState,
+  onSwitchWifi,
 }) {
   useEffect(() => {
     if (!open) return undefined
@@ -331,6 +334,70 @@ function VideoSettingsModal({
                 </span>
                 <i aria-hidden="true"><b /></i>
               </button>
+            </section>
+
+            <section className="TuningSection WifiSwitchSection">
+              <div className="WifiSwitchHeading">
+                <h3 className="TuningSectionTitle">网络链路</h3>
+                <span>LIVE SCAN</span>
+              </div>
+
+              <div className="WifiNetworkList" aria-live="polite">
+                {wifiNetworks.loading ? (
+                  <div className="WifiNetworkLoading">正在扫描可用网络…</div>
+                ) : wifiNetworks.error ? (
+                  <div className="WifiNetworkError">{wifiNetworks.error}</div>
+                ) : wifiNetworks.networks.map((network, index) => {
+                  const switching = ['requesting', 'switching'].includes(
+                    wifiSwitchState.status,
+                  )
+                  const selected = wifiSwitchState.requestedSsid === network.ssid
+                  const disabled = network.current || !network.available || switching
+
+                  return (
+                    <button
+                      key={network.ssid}
+                      type="button"
+                      className={[
+                        'WifiNetworkOption',
+                        network.current ? 'current' : '',
+                        !network.available ? 'unavailable' : '',
+                        selected && switching ? 'switching' : '',
+                      ].filter(Boolean).join(' ')}
+                      disabled={disabled}
+                      onClick={() => onSwitchWifi(network.ssid)}
+                    >
+                      <span className="WifiNetworkRank">0{index + 1}</span>
+                      <span className="WifiNetworkName">
+                        <strong>{network.ssid}</strong>
+                        <small>
+                          {network.current
+                            ? '当前连接'
+                            : network.available
+                              ? `${network.frequency >= 5000 ? '5 GHz' : '2.4 GHz'} · ${network.signal} dBm`
+                              : '当前不可见'}
+                        </small>
+                      </span>
+                      <span className="WifiNetworkAction">
+                        {network.current
+                          ? '已连接'
+                          : selected && switching
+                            ? '切换中'
+                            : network.available ? '切换' : '离线'}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {wifiSwitchState.message && (
+                <p className={`WifiSwitchMessage ${wifiSwitchState.status}`}>
+                  {wifiSwitchState.message}
+                </p>
+              )}
+              <p className="WifiSwitchWarning">
+                切换会触发停车保护；若连接失败，车端将自动恢复可用网络。
+              </p>
             </section>
           </div>
         </div>
