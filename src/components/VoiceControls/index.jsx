@@ -38,6 +38,16 @@ const getListenButtonTitle = (status, detail, mode) => {
   return '打开树莓派车端声音'
 }
 
+const getPlaybackLabel = kind => {
+  if (kind === 'usb') {
+    return 'USB'
+  }
+  if (kind === 'headphones') {
+    return '耳机口'
+  }
+  return kind ? '其他输出' : ''
+}
+
 const VoiceControls = ({ socket }) => {
   const [status, setStatus] = useState('idle')
   const [speaking, setSpeaking] = useState(false)
@@ -45,6 +55,7 @@ const VoiceControls = ({ socket }) => {
   const [talkReady, setTalkReady] = useState(false)
   const [sessionMode, setSessionMode] = useState('ptt')
   const [detail, setDetail] = useState('')
+  const [playbackKind, setPlaybackKind] = useState('')
 
   const audioRef = useRef()
   const peerRef = useRef()
@@ -57,6 +68,13 @@ const VoiceControls = ({ socket }) => {
   const restartingRef = useRef(false)
   const wantsSpeakingRef = useRef(false)
   const lastTouchAtRef = useRef(0)
+  const playbackKindRef = useRef('')
+
+  const getTalkDetail = speakingNow => {
+    const outputLabel = getPlaybackLabel(playbackKindRef.current)
+    const base = speakingNow ? '正在向车端说话' : '车端音箱已就绪'
+    return outputLabel ? `${base}（${outputLabel}）` : base
+  }
 
   const setVoiceMode = mode => {
     sessionModeRef.current = mode
@@ -83,7 +101,7 @@ const VoiceControls = ({ socket }) => {
 
     if (sessionModeRef.current === 'talk' && !endTalkSession) {
       if (updateDetail && sessionRef.current) {
-        setDetail(talkReady ? '车端音箱已就绪' : '正在预连接车端音箱')
+        setDetail(talkReady ? getTalkDetail(false) : '正在预连接车端音箱')
       }
       return
     }
@@ -104,6 +122,8 @@ const VoiceControls = ({ socket }) => {
       setVoiceMode('ptt')
       stopLocalMedia()
       setTalkReady(false)
+      playbackKindRef.current = ''
+      setPlaybackKind('')
       setStatus('idle')
       setDetail('')
       return
@@ -143,6 +163,8 @@ const VoiceControls = ({ socket }) => {
     sessionRef.current = null
     setVoiceMode('ptt')
     setTalkReady(false)
+    playbackKindRef.current = ''
+    setPlaybackKind('')
     if (!keepStream) {
       stopLocalMedia()
     }
@@ -245,12 +267,12 @@ const VoiceControls = ({ socket }) => {
           voiceSenderRef.current.replaceTrack(localTrack).catch(() => {})
           setSpeaking(true)
           setTalkConnecting(false)
-          setDetail('正在向车端说话')
+          setDetail(getTalkDetail(true))
         } else {
           setTalkConnecting(false)
           setDetail(
             sessionModeRef.current === 'talk'
-              ? '车端音箱已就绪'
+              ? getTalkDetail(false)
               : '正在收听车端声音',
           )
         }
@@ -307,6 +329,11 @@ const VoiceControls = ({ socket }) => {
         return
       }
 
+      if (payload.playbackKind) {
+        playbackKindRef.current = payload.playbackKind
+        setPlaybackKind(payload.playbackKind)
+      }
+
       if (payload.status === 'idle') {
         if (restartingRef.current) {
           return
@@ -350,10 +377,10 @@ const VoiceControls = ({ socket }) => {
             setTalkConnecting(false)
             if (wantsSpeakingRef.current) {
               setSpeaking(true)
-              setDetail('正在向车端说话')
+              setDetail(getTalkDetail(true))
             } else {
               setSpeaking(false)
-              setDetail('车端音箱已就绪')
+              setDetail(getTalkDetail(false))
             }
           } else if (payload.status === 'pipeline-ready') {
             setTalkConnecting(true)
@@ -594,7 +621,7 @@ const VoiceControls = ({ socket }) => {
         }
         setTalkConnecting(false)
         setSpeaking(true)
-        setDetail('正在向车端说话')
+        setDetail(getTalkDetail(true))
         return
       }
 
@@ -683,6 +710,11 @@ const VoiceControls = ({ socket }) => {
       >
         {talkButtonText}
       </button>
+      {sessionMode === 'talk' && talkReady && playbackKind && (
+        <span className={`VoiceOutput VoiceOutput--${playbackKind}`} title={detail}>
+          {getTalkDetail(speaking)}
+        </span>
+      )}
     </span>
   )
 }
