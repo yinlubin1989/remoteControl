@@ -63,6 +63,45 @@ body,
 .WifiStatus.warn {
     color: #ffb37a;
 }
+.GamepadStatus {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: min(320px, 45vw);
+    gap: 5px;
+    overflow: hidden;
+    color: #6f9299;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.GamepadStatus i {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 auto;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+}
+.GamepadStatus--connected {
+    color: #acf9fb;
+}
+.GamepadStatus--active {
+    color: #8fffb2;
+    text-shadow: 0 0 10px rgba(143, 255, 178, 0.42);
+}
+.GamepadStatus--active i {
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+    animation: gamepad-status-pulse 900ms ease-in-out infinite alternate;
+}
+.GamepadStatus--incompatible,
+.GamepadStatus--unsupported {
+    color: #ffb37a;
+}
+@keyframes gamepad-status-pulse {
+    from { opacity: 0.45; }
+    to { opacity: 1; }
+}
 .VideoSettingsOpen {
     overflow: hidden;
 }
