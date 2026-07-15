@@ -715,6 +715,11 @@ const VoiceControls = ({ socket }) => {
           {getTalkDetail(speaking)}
         </span>
       )}
+      {status === 'error' && detail && (
+        <span className="VoiceError" role="alert">
+          {detail}
+        </span>
+      )}
     </span>
   )
 }
