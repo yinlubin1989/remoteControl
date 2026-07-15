@@ -80,7 +80,10 @@ const applyJoystickDeadZone = (value) => {
   return 50 + Math.sign(offset) * adjustedDistance
 }
 
+let heartbeatTimer
+
 socket.on("connect", () => {
+  clearInterval(heartbeatTimer)
   socket.emit('setPulseLength', {
     pin: 15,
     data: THROTTLE_NEUTRAL
@@ -92,9 +95,16 @@ socket.on("connect", () => {
     })
   }, 500)
   socket.emit('hb')
-  setInterval(() => {
-    socket.emit('hb')
+  heartbeatTimer = setInterval(() => {
+    if (socket.connected) {
+      socket.emit('hb')
+    }
   }, 500)
+})
+
+socket.on('disconnect', () => {
+  clearInterval(heartbeatTimer)
+  heartbeatTimer = undefined
 })
 
 function App() {
