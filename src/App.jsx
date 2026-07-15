@@ -46,8 +46,14 @@ const isIOSDevice = () => (
 const socket = io()
 window.socket = socket
 const THROTTLE_NEUTRAL = 1500
+const STEERING_CENTER_DEFAULT = 1500
+const STEERING_CENTER_MIN = 1200
+const STEERING_CENTER_MAX = 1800
+const STEERING_PULSE_MIN = 500
+const STEERING_PULSE_MAX = 2500
 const BRAKE_PWM_OFFSET = 300
 const STEERING_DIRECTION_KEY = 'steering-direction'
+const STEERING_CENTER_KEY = 'steering-center-pulse'
 const MOTOR_DIRECTION_KEY = 'motor-direction'
 const DECODER_STORAGE_KEY = 'video-decoder'
 const CONTROL_MODE_STORAGE_KEY = 'car-control-mode'
@@ -58,6 +64,17 @@ const VALID_CONTROL_MODES = ['separate', 'joystick', 'cockpit']
 const loadDirectionSetting = (key) => (
   window.localStorage.getItem(key) === 'reverse'
 )
+
+const loadSteeringCenter = () => {
+  const saved = window.localStorage.getItem(STEERING_CENTER_KEY)
+  if (saved === null || saved === '') return STEERING_CENTER_DEFAULT
+  const savedValue = Number(saved)
+  if (!Number.isFinite(savedValue)) return STEERING_CENTER_DEFAULT
+  return Math.min(
+    STEERING_CENTER_MAX,
+    Math.max(STEERING_CENTER_MIN, savedValue),
+  )
+}
 
 const loadVideoDecoder = () => {
   const queryDecoder = new URLSearchParams(window.location.search).get('decoder')
@@ -123,12 +140,14 @@ function App() {
   const [steeringReversed, setSteeringReversed] = useState(() => (
     loadDirectionSetting(STEERING_DIRECTION_KEY)
   ))
+  const [steeringCenter, setSteeringCenter] = useState(loadSteeringCenter)
   const [motorReversed, setMotorReversed] = useState(() => (
     loadDirectionSetting(MOTOR_DIRECTION_KEY)
   ))
   const [cam, setCam] = useState(50)
   const [isFullScreen, setIsFullScreen] = useState(false)
   const steeringReversedRef = useRef(steeringReversed)
+  const steeringCenterRef = useRef(steeringCenter)
   const motorReversedRef = useRef(motorReversed)
   const controlModeRef = useRef(controlMode)
   const cockpitTravelDirectionRef = useRef('D')
@@ -208,6 +227,15 @@ function App() {
   }, [steeringReversed])
 
   useEffect(() => {
+    steeringCenterRef.current = steeringCenter
+    window.localStorage.setItem(STEERING_CENTER_KEY, steeringCenter)
+    socket.emit('setPulseLength', {
+      pin: 14,
+      data: steeringCenter,
+    })
+  }, [steeringCenter])
+
+  useEffect(() => {
     motorReversedRef.current = motorReversed
     window.localStorage.setItem(
       MOTOR_DIRECTION_KEY,
@@ -226,9 +254,9 @@ function App() {
     const wheelValue = getSteeringValue(lgWheel)
     socket.emit('setPulseLength', {
       pin: 14,
-      data: (((wheelValue - 50) * 0.5) + 50) * 19 + 610
+      data: steeringCenter + (wheelValue - 50) * 9.5,
     })
-  }, [controlMode, lgWheel, steeringReversed])
+  }, [controlMode, lgWheel, steeringReversed, steeringCenter])
 
   useEffect(() => {
     if (controlMode !== 'separate') return
@@ -328,10 +356,11 @@ function App() {
   }
 
   const pwmChange = (pinKey, e) => {
-    const value = pinKey === 14 ? getSteeringValue(e) : e
     socket.emit('setPulseLength', {
       pin: pinKey,
-      data: value * 20 + 500
+      data: pinKey === 14
+        ? getSteeringPulse(e)
+        : e * 20 + 500,
     })
   }
 
@@ -339,6 +368,16 @@ function App() {
     if (!steeringReversedRef.current) return value
     return 100 - value
   }
+
+  const getSteeringPulse = (value) => (
+    Math.min(
+      STEERING_PULSE_MAX,
+      Math.max(
+        STEERING_PULSE_MIN,
+        steeringCenterRef.current + (getSteeringValue(value) - 50) * 20,
+      ),
+    )
+  )
 
   const getMotorPulse = (pwm) => {
     if (!motorReversedRef.current) return pwm
@@ -485,7 +524,7 @@ function App() {
     })
     socket.emit('setPulseLength', {
       pin: 14,
-      data: 1500,
+      data: steeringCenterRef.current,
     })
   }, [])
 
@@ -659,13 +698,18 @@ function App() {
         onChange={setDraftSettings}
         onApply={applyVideoSettings}
         onClose={() => setSettingsOpen(false)}
-        onReset={() => setDraftSettings({ ...DEFAULT_CUSTOM_SETTINGS })}
+        onReset={() => {
+          setDraftSettings({ ...DEFAULT_CUSTOM_SETTINGS })
+          setSteeringCenter(STEERING_CENTER_DEFAULT)
+        }}
         onSelectProfile={setVideoProfile}
         onSelectColor={selectVideoColor}
         activeDecoder={videoDecoder}
         onSelectDecoder={selectVideoDecoder}
         steeringReversed={steeringReversed}
+        steeringCenter={steeringCenter}
         motorReversed={motorReversed}
+        onSteeringCenterChange={setSteeringCenter}
         onToggleSteeringDirection={toggleSteeringDirection}
         onToggleMotorDirection={toggleMotorDirection}
       />

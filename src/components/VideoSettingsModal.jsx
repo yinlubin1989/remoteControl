@@ -71,7 +71,9 @@ function VideoSettingsModal({
   activeDecoder,
   onSelectDecoder,
   steeringReversed,
+  steeringCenter,
   motorReversed,
+  onSteeringCenterChange,
   onToggleSteeringDirection,
   onToggleMotorDirection,
 }) {
@@ -112,7 +114,7 @@ function VideoSettingsModal({
         <header className="VideoSettingsHeader">
           <div>
             <h2 id="settings-title">设置</h2>
-            <p>调整图传参数和底盘方向</p>
+            <p>调整图传参数与底盘校准</p>
           </div>
           <button
             className="VideoSettingsClose"
@@ -289,7 +291,18 @@ function VideoSettingsModal({
             </section>
 
             <section className="TuningSection">
-              <h3 className="TuningSectionTitle">底盘方向</h3>
+              <h3 className="TuningSectionTitle">底盘校准</h3>
+
+              <RangeControl
+                label="方向中位"
+                hint="拖动时舵机实时响应，并自动保存"
+                value={steeringCenter}
+                displayValue={`${steeringCenter} μs`}
+                min={1200}
+                max={1800}
+                step={10}
+                onChange={onSteeringCenterChange}
+              />
 
               <button
                 className="MonochromeSwitch"
