@@ -7,6 +7,7 @@ import CarJoystick from './components/CarJoystick'
 import CockpitControls from './components/CockpitControls'
 import { applyCockpitSteeringCurve } from './components/CockpitControls/controlMath'
 import {
+  getComfortThrottleAxis,
   getGamepadDriveOutput,
   isStandardDriveGamepad,
 } from './gamepadControl'
@@ -61,6 +62,7 @@ const STEERING_CENTER_KEY = 'steering-center-pulse'
 const MOTOR_DIRECTION_KEY = 'motor-direction'
 const DECODER_STORAGE_KEY = 'video-decoder'
 const CONTROL_MODE_STORAGE_KEY = 'car-control-mode'
+const GAMEPAD_DRIVE_MODE_STORAGE_KEY = 'gamepad-drive-mode'
 const JOYSTICK_DEAD_ZONE = 4
 const VALID_DECODERS = ['webcodecs', 'broadway']
 const VALID_CONTROL_MODES = ['separate', 'joystick', 'cockpit']
@@ -142,6 +144,9 @@ function App() {
   const videoPlayer = useRef()
   const [pannel, setPannel] = useState('')
   const [isLimit, setIsLimit] = useState(false)
+  const [gamepadComfortMode, setGamepadComfortMode] = useState(() => (
+    window.localStorage.getItem(GAMEPAD_DRIVE_MODE_STORAGE_KEY) === 'comfort'
+  ))
   const [controlMode, setControlMode] = useState(() => {
     const savedMode = window.localStorage.getItem(CONTROL_MODE_STORAGE_KEY)
     return VALID_CONTROL_MODES.includes(savedMode) ? savedMode : 'separate'
@@ -160,6 +165,7 @@ function App() {
   const controlModeRef = useRef(controlMode)
   const isLimitRef = useRef(isLimit)
   const gamepadActiveRef = useRef(false)
+  const gamepadComfortModeRef = useRef(gamepadComfortMode)
   const cockpitTravelDirectionRef = useRef('D')
   const [gamepadState, setGamepadState] = useState(() => ({
     status: typeof navigator.getGamepads === 'function'
@@ -513,6 +519,18 @@ function App() {
     setIsLimit(e)
   }
 
+  const toggleGamepadComfortMode = () => {
+    setGamepadComfortMode(current => {
+      const next = !current
+      gamepadComfortModeRef.current = next
+      window.localStorage.setItem(
+        GAMEPAD_DRIVE_MODE_STORAGE_KEY,
+        next ? 'comfort' : 'sport',
+      )
+      return next
+    })
+  }
+
   const toggleControlMode = () => {
     neutralizeCockpit()
     setControlMode(current => {
@@ -571,6 +589,8 @@ function App() {
     let lastSteeringPulse
     let lastThrottlePulse
     let lastGamepadId = ''
+    let lastPollAt
+    let appliedThrottleAxis = 0
 
     const updateStatus = (status, id = '') => {
       setGamepadState(current => (
@@ -595,6 +615,8 @@ function App() {
       gamepadActiveRef.current = false
       lastSteeringPulse = undefined
       lastThrottlePulse = undefined
+      lastPollAt = undefined
+      appliedThrottleAxis = 0
       updateStatus(status, id)
     }
 
@@ -621,7 +643,7 @@ function App() {
         return
       }
 
-      const output = getGamepadDriveOutput({
+      const targetOutput = getGamepadDriveOutput({
         leftY: gamepad.axes[1],
         rightX: gamepad.axes[2],
         isLimit: isLimitRef.current,
@@ -631,11 +653,31 @@ function App() {
       })
       lastGamepadId = gamepad.id
 
-      if (!output.active) {
+      if (!targetOutput.active) {
         neutralizeGamepad('connected', gamepad.id)
         animationFrame = window.requestAnimationFrame(pollGamepad)
         return
       }
+
+      const elapsedMs = lastPollAt === undefined
+        ? 0
+        : Math.min(100, timestamp - lastPollAt)
+      lastPollAt = timestamp
+      appliedThrottleAxis = getComfortThrottleAxis({
+        currentAxis: appliedThrottleAxis,
+        targetAxis: targetOutput.throttleAxis,
+        elapsedMs,
+        enabled: gamepadComfortModeRef.current,
+      })
+      const output = getGamepadDriveOutput({
+        leftY: gamepad.axes[1],
+        rightX: gamepad.axes[2],
+        appliedThrottleAxis,
+        isLimit: isLimitRef.current,
+        steeringCenter: steeringCenterRef.current,
+        steeringReversed: steeringReversedRef.current,
+        motorReversed: motorReversedRef.current,
+      })
 
       gamepadActiveRef.current = true
       updateStatus('active', gamepad.id)
@@ -901,6 +943,8 @@ function App() {
         openVideoSettings={openVideoSettings}
         controlMode={controlMode}
         toggleControlMode={toggleControlMode}
+        gamepadComfortMode={gamepadComfortMode}
+        toggleGamepadComfortMode={toggleGamepadComfortMode}
       />
       {controlMode === 'joystick' ? (
         <CarJoystick onChange={handleJoystickChange} />

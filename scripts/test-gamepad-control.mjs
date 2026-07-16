@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import {
+  getComfortThrottleAxis,
   getGamepadDriveOutput,
   isStandardDriveGamepad,
   normalizeGamepadAxis,
@@ -9,6 +10,50 @@ assert.equal(normalizeGamepadAxis(0.08), 0)
 assert.equal(normalizeGamepadAxis(-0.04), 0)
 assert.equal(normalizeGamepadAxis(1), 1)
 assert.equal(normalizeGamepadAxis(-1), -1)
+
+assert.equal(getComfortThrottleAxis({
+  currentAxis: 0,
+  targetAxis: -1,
+  elapsedMs: 1000,
+  enabled: false,
+}), -1)
+assert.equal(getComfortThrottleAxis({
+  currentAxis: 0,
+  targetAxis: -1,
+  elapsedMs: 1000,
+  enabled: true,
+}), -0.5)
+assert.equal(getComfortThrottleAxis({
+  currentAxis: -0.5,
+  targetAxis: -1,
+  elapsedMs: 1000,
+  enabled: true,
+}), -1)
+assert.equal(getComfortThrottleAxis({
+  currentAxis: -0.8,
+  targetAxis: -0.3,
+  elapsedMs: 16,
+  enabled: true,
+}), -0.3)
+assert.equal(getComfortThrottleAxis({
+  currentAxis: -0.8,
+  targetAxis: 0,
+  elapsedMs: 16,
+  enabled: true,
+}), 0)
+assert.equal(getComfortThrottleAxis({
+  currentAxis: -0.8,
+  targetAxis: 0.8,
+  elapsedMs: 16,
+  enabled: true,
+}), 0)
+
+assert.equal(getComfortThrottleAxis({
+  currentAxis: 0,
+  targetAxis: 1,
+  elapsedMs: 2000,
+  enabled: true,
+}), 1)
 
 assert.equal(isStandardDriveGamepad({
   connected: true,
@@ -32,6 +77,11 @@ assert.equal(getGamepadDriveOutput({ leftY: 1, rightX: 0 }).throttlePulse, 2000)
 assert.equal(getGamepadDriveOutput({ leftY: -1, rightX: 0, isLimit: true }).throttlePulse, 1250)
 assert.equal(getGamepadDriveOutput({ leftY: 1, rightX: 0, isLimit: true }).throttlePulse, 1700)
 assert.equal(getGamepadDriveOutput({ leftY: -1, rightX: 0, motorReversed: true }).throttlePulse, 2000)
+assert.equal(getGamepadDriveOutput({
+  leftY: -1,
+  rightX: 0,
+  appliedThrottleAxis: -0.5,
+}).throttlePulse, 1250)
 
 assert.equal(getGamepadDriveOutput({ leftY: 0, rightX: 1 }).steeringPulse, 500)
 assert.equal(getGamepadDriveOutput({ leftY: 0, rightX: 1, steeringReversed: true }).steeringPulse, 2500)
