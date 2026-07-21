@@ -1,5 +1,5 @@
 export const GAMEPAD_AXIS_DEAD_ZONE = 0.08
-export const GAMEPAD_COMFORT_FULL_RAMP_MS = 2000
+export const GAMEPAD_COMFORT_FULL_RAMP_MS = 4000
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
@@ -36,11 +36,11 @@ export const getComfortThrottleAxis = ({
   if (current !== 0 && Math.sign(current) !== Math.sign(target)) return 0
   if (Math.abs(target) <= Math.abs(current)) return target
 
-  const maxStep = Math.max(0, elapsedMs) / GAMEPAD_COMFORT_FULL_RAMP_MS
-  return current + Math.sign(target) * Math.min(
-    Math.abs(target - current),
-    maxStep,
-  )
+  const currentProgress = Math.sqrt(Math.abs(current))
+  const progressStep = Math.max(0, elapsedMs) / GAMEPAD_COMFORT_FULL_RAMP_MS
+  const nextProgress = Math.min(1, currentProgress + progressStep)
+  const nextMagnitude = Math.min(Math.abs(target), nextProgress ** 2)
+  return Math.sign(target) * nextMagnitude
 }
 
 export const getGamepadDriveOutput = ({

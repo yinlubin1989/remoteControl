@@ -62,7 +62,7 @@ const Main = ({
         role="button"
         aria-pressed={gamepadComfortMode}
         title={gamepadComfortMode
-          ? '手柄油门约 2 秒渐进至目标，点击切换运动模式'
+          ? '手柄油门约 4 秒渐进至目标，点击切换运动模式'
           : '手柄油门立即响应，点击切换舒适模式'}
         onClick={toggleGamepadComfortMode}
       >
