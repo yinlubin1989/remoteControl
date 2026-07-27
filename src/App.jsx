@@ -139,7 +139,7 @@ socket.on('disconnect', () => {
 })
 
 function App() {
-  const refSpeed = useRef()
+  const refSpeed = useRef(0)
   const gearValue = useRef('D')
   const videoPlayer = useRef()
   const [pannel, setPannel] = useState('')
@@ -673,6 +673,7 @@ function App() {
         leftY: gamepad.axes[1],
         rightX: gamepad.axes[2],
         appliedThrottleAxis,
+        throttleLimitPercent: refSpeed.current,
         isLimit: isLimitRef.current,
         steeringCenter: steeringCenterRef.current,
         steeringReversed: steeringReversedRef.current,

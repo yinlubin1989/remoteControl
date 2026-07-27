@@ -102,6 +102,16 @@ assert.deepEqual(
 
 assert.equal(getGamepadDriveOutput({ leftY: -1, rightX: 0 }).throttlePulse, 1000)
 assert.equal(getGamepadDriveOutput({ leftY: 1, rightX: 0 }).throttlePulse, 2000)
+assert.equal(getGamepadDriveOutput({
+  leftY: -1,
+  rightX: 0,
+  throttleLimitPercent: 50,
+}).throttlePulse, 1250)
+assert.equal(getGamepadDriveOutput({
+  leftY: 1,
+  rightX: 0,
+  throttleLimitPercent: 50,
+}).throttlePulse, 1750)
 assert.equal(getGamepadDriveOutput({ leftY: -1, rightX: 0, isLimit: true }).throttlePulse, 1250)
 assert.equal(getGamepadDriveOutput({ leftY: 1, rightX: 0, isLimit: true }).throttlePulse, 1700)
 assert.equal(getGamepadDriveOutput({ leftY: -1, rightX: 0, motorReversed: true }).throttlePulse, 2000)
