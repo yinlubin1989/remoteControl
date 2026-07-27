@@ -303,7 +303,7 @@ function VideoSettingsModal({
                 displayValue={`${steeringCenter} μs`}
                 min={1200}
                 max={1800}
-                step={10}
+                step={1}
                 onChange={onSteeringCenterChange}
               />
 
