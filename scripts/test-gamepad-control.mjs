@@ -17,27 +17,34 @@ assert.equal(getComfortThrottleAxis({
   elapsedMs: 1000,
   enabled: false,
 }), -1)
-const comfortAfterOneSecond = getComfortThrottleAxis({
+const comfortAfterHalfSecond = getComfortThrottleAxis({
   currentAxis: 0,
   targetAxis: -1,
-  elapsedMs: 1000,
+  elapsedMs: 500,
   enabled: true,
 })
-assert.equal(comfortAfterOneSecond, -0.0625)
+assert.equal(comfortAfterHalfSecond, -0.15)
+const comfortAfterOneSecond = getComfortThrottleAxis({
+  currentAxis: comfortAfterHalfSecond,
+  targetAxis: -1,
+  elapsedMs: 500,
+  enabled: true,
+})
+assert.equal(comfortAfterOneSecond, -0.3)
 const comfortAfterTwoSeconds = getComfortThrottleAxis({
   currentAxis: comfortAfterOneSecond,
   targetAxis: -1,
   elapsedMs: 1000,
   enabled: true,
 })
-assert.equal(comfortAfterTwoSeconds, -0.25)
+assert.equal(comfortAfterTwoSeconds, -0.55)
 const comfortAfterThreeSeconds = getComfortThrottleAxis({
   currentAxis: comfortAfterTwoSeconds,
   targetAxis: -1,
   elapsedMs: 1000,
   enabled: true,
 })
-assert.equal(comfortAfterThreeSeconds, -0.5625)
+assert.equal(comfortAfterThreeSeconds, -0.75)
 assert.equal(getComfortThrottleAxis({
   currentAxis: comfortAfterThreeSeconds,
   targetAxis: -1,
@@ -51,11 +58,11 @@ assert.equal(getComfortThrottleAxis({
   enabled: true,
 }), -0.3)
 assert.equal(getComfortThrottleAxis({
-  currentAxis: -0.25,
+  currentAxis: -0.3,
   targetAxis: -1,
   elapsedMs: 1000,
   enabled: true,
-}), -0.5625)
+}), -0.55)
 assert.equal(getComfortThrottleAxis({
   currentAxis: -0.8,
   targetAxis: 0,
