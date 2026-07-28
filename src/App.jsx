@@ -8,8 +8,11 @@ import CockpitControls from './components/CockpitControls'
 import { applyCockpitSteeringCurve } from './components/CockpitControls/controlMath'
 import {
   getComfortThrottleAxis,
+  getDriveGamepadInput,
+  getGamepadEmergencyLatched,
   getGamepadDriveOutput,
-  isStandardDriveGamepad,
+  isDriveGamepad,
+  isDriveGamepadIdentity,
 } from './gamepadControl'
 import Keybords from './components/Keybords'
 import Gear from './components/Gear'
@@ -218,6 +221,8 @@ function App() {
     : ''
   const gamepadText = gamepadState.status === 'active'
     ? `手柄接管中 · ${gamepadName}`
+    : gamepadState.status === 'emergency'
+      ? `遥控器急停 · 回中解锁 · ${gamepadName}`
     : gamepadState.status === 'connected'
       ? `手柄已连接 · ${gamepadName}`
       : gamepadState.status === 'incompatible'
@@ -591,6 +596,8 @@ function App() {
     let lastGamepadId = ''
     let lastPollAt
     let appliedThrottleAxis = 0
+    let lastComfortButtonPressed = false
+    let emergencyLatched = false
 
     const updateStatus = (status, id = '') => {
       setGamepadState(current => (
@@ -623,12 +630,31 @@ function App() {
     const readGamepads = () => Array.from(navigator.getGamepads() || [])
       .filter(gamepad => gamepad?.connected)
 
+    const engageEmergencyStop = id => {
+      socket.emit('setPulseLength', {
+        pin: 15,
+        data: THROTTLE_NEUTRAL,
+      })
+      socket.emit('setPulseLength', {
+        pin: 14,
+        data: steeringCenterRef.current,
+      })
+      gamepadActiveRef.current = false
+      lastThrottlePulse = THROTTLE_NEUTRAL
+      lastSteeringPulse = steeringCenterRef.current
+      lastPollAt = undefined
+      appliedThrottleAxis = 0
+      updateStatus('emergency', id)
+    }
+
     const pollGamepad = timestamp => {
       const connectedGamepads = readGamepads()
-      const gamepad = connectedGamepads.find(isStandardDriveGamepad)
+      const gamepad = connectedGamepads.find(isDriveGamepad)
 
       if (!gamepad) {
         const incompatible = connectedGamepads[0]
+        lastComfortButtonPressed = false
+        emergencyLatched = false
         neutralizeGamepad(
           incompatible ? 'incompatible' : 'disconnected',
           incompatible?.id || lastGamepadId,
@@ -638,14 +664,42 @@ function App() {
       }
 
       if (suspended) {
+        lastComfortButtonPressed = false
+        emergencyLatched = false
         neutralizeGamepad('connected', gamepad.id)
         animationFrame = window.requestAnimationFrame(pollGamepad)
         return
       }
 
+      const input = getDriveGamepadInput(gamepad)
+      const wasEmergencyLatched = emergencyLatched
+      emergencyLatched = getGamepadEmergencyLatched({
+        latched: emergencyLatched,
+        emergencyPressed: input.emergencyPressed,
+        leftY: input.leftY,
+        rightX: input.rightX,
+      })
+      if (emergencyLatched) {
+        lastComfortButtonPressed = input.comfortPressed
+        if (!wasEmergencyLatched) engageEmergencyStop(gamepad.id)
+        else updateStatus('emergency', gamepad.id)
+        animationFrame = window.requestAnimationFrame(pollGamepad)
+        return
+      }
+      if (wasEmergencyLatched) {
+        lastComfortButtonPressed = input.comfortPressed
+        neutralizeGamepad('connected', gamepad.id)
+        animationFrame = window.requestAnimationFrame(pollGamepad)
+        return
+      }
+      if (input.comfortPressed && !lastComfortButtonPressed) {
+        toggleGamepadComfortMode()
+      }
+      lastComfortButtonPressed = input.comfortPressed
+
       const targetOutput = getGamepadDriveOutput({
-        leftY: gamepad.axes[1],
-        rightX: gamepad.axes[2],
+        leftY: input.leftY,
+        rightX: input.rightX,
         isLimit: isLimitRef.current,
         steeringCenter: steeringCenterRef.current,
         steeringReversed: steeringReversedRef.current,
@@ -670,8 +724,8 @@ function App() {
         enabled: gamepadComfortModeRef.current,
       })
       const output = getGamepadDriveOutput({
-        leftY: gamepad.axes[1],
-        rightX: gamepad.axes[2],
+        leftY: input.leftY,
+        rightX: input.rightX,
         appliedThrottleAxis,
         throttleLimitPercent: refSpeed.current,
         isLimit: isLimitRef.current,
@@ -706,7 +760,9 @@ function App() {
 
     const suspendGamepad = () => {
       suspended = true
-      const gamepad = readGamepads().find(isStandardDriveGamepad)
+      const gamepad = readGamepads().find(isDriveGamepad)
+      lastComfortButtonPressed = false
+      emergencyLatched = false
       neutralizeGamepad(
         gamepad ? 'connected' : 'disconnected',
         gamepad?.id || lastGamepadId,
@@ -720,7 +776,9 @@ function App() {
       else resumeGamepad()
     }
     const onGamepadDisconnected = event => {
-      if (event.gamepad?.mapping === 'standard') {
+      if (isDriveGamepadIdentity(event.gamepad)) {
+        lastComfortButtonPressed = false
+        emergencyLatched = false
         neutralizeGamepad('disconnected', event.gamepad.id)
       }
     }

@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import {
   getComfortThrottleAxis,
+  getDriveGamepadInput,
+  getGamepadEmergencyLatched,
   getGamepadDriveOutput,
-  isStandardDriveGamepad,
+  isDriveGamepad,
+  isDriveGamepadIdentity,
   normalizeGamepadAxis,
 } from '../src/gamepadControl.js'
 
@@ -83,15 +86,55 @@ assert.equal(getComfortThrottleAxis({
   enabled: true,
 }), 1)
 
-assert.equal(isStandardDriveGamepad({
+assert.equal(isDriveGamepad({
   connected: true,
   mapping: 'standard',
   axes: [0, 0, 0, 0],
 }), true)
-assert.equal(isStandardDriveGamepad({
+assert.equal(isDriveGamepad({
+  connected: true,
+  id: 'RC Car Controller (Vendor: 045e Product: 02fd)',
+  mapping: '',
+  axes: [0, 0, 0, 0],
+}), true)
+assert.equal(isDriveGamepad({
   connected: true,
   mapping: '',
   axes: [0, 0, 0, 0],
+}), false)
+assert.equal(isDriveGamepadIdentity({
+  connected: false,
+  mapping: 'standard',
+  axes: [0, 0, 0, 0],
+}), true)
+
+const remoteInput = getDriveGamepadInput({
+  axes: [0.25, -0.5, 0.75, -0.25],
+  buttons: Array.from({ length: 12 }, (_, index) => ({
+    pressed: index === 10,
+    value: index === 11 ? 1 : 0,
+  })),
+})
+assert.deepEqual(remoteInput, {
+  leftY: -0.5,
+  rightX: 0.75,
+  comfortPressed: true,
+  emergencyPressed: true,
+})
+assert.equal(getGamepadEmergencyLatched({
+  emergencyPressed: true,
+  leftY: -1,
+  rightX: 1,
+}), true)
+assert.equal(getGamepadEmergencyLatched({
+  latched: true,
+  leftY: 0.2,
+  rightX: 0,
+}), true)
+assert.equal(getGamepadEmergencyLatched({
+  latched: true,
+  leftY: 0.04,
+  rightX: -0.08,
 }), false)
 
 const centered = getGamepadDriveOutput({ leftY: 0, rightX: 0 })

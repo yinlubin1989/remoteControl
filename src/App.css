@@ -94,6 +94,15 @@ body,
     box-shadow: 0 0 8px currentColor;
     animation: gamepad-status-pulse 900ms ease-in-out infinite alternate;
 }
+.GamepadStatus--emergency {
+    color: #ff6b5f;
+    text-shadow: 0 0 10px rgba(255, 107, 95, 0.48);
+}
+.GamepadStatus--emergency i {
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+    animation: gamepad-status-pulse 400ms ease-in-out infinite alternate;
+}
 .GamepadStatus--incompatible,
 .GamepadStatus--unsupported {
     color: #ffb37a;

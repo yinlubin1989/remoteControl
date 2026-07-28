@@ -1,5 +1,6 @@
 export const GAMEPAD_AXIS_DEAD_ZONE = 0.08
 export const GAMEPAD_COMFORT_FULL_RAMP_MS = 4000
+export const REMOTE_CONTROL_GAMEPAD_NAME = 'RC Car Controller'
 
 const GAMEPAD_COMFORT_RAMP_POINTS = [
   { elapsedMs: 0, magnitude: 0 },
@@ -57,12 +58,43 @@ export const normalizeGamepadAxis = (
   )
 }
 
-export const isStandardDriveGamepad = gamepad => Boolean(
+export const isDriveGamepadIdentity = gamepad => Boolean(
   gamepad
-  && gamepad.connected
-  && gamepad.mapping === 'standard'
-  && gamepad.axes?.length >= 3
+  && (
+    (gamepad.mapping === 'standard' && gamepad.axes?.length >= 3)
+    || (
+      gamepad.id?.includes(REMOTE_CONTROL_GAMEPAD_NAME)
+      && gamepad.axes?.length >= 4
+    )
+  )
 )
+
+export const isDriveGamepad = gamepad => Boolean(
+  gamepad?.connected && isDriveGamepadIdentity(gamepad)
+)
+
+const isButtonPressed = button => Boolean(
+  button?.pressed || button?.value > 0.5
+)
+
+export const getDriveGamepadInput = gamepad => ({
+  leftY: gamepad?.axes?.[1] || 0,
+  rightX: gamepad?.axes?.[2] || 0,
+  comfortPressed: isButtonPressed(gamepad?.buttons?.[10]),
+  emergencyPressed: isButtonPressed(gamepad?.buttons?.[11]),
+})
+
+export const getGamepadEmergencyLatched = ({
+  latched = false,
+  emergencyPressed = false,
+  leftY = 0,
+  rightX = 0,
+}) => {
+  if (emergencyPressed) return true
+  if (!latched) return false
+  return normalizeGamepadAxis(leftY) !== 0
+    || normalizeGamepadAxis(rightX) !== 0
+}
 
 export const getComfortThrottleAxis = ({
   currentAxis = 0,
