@@ -32,6 +32,14 @@ const DEFAULT_CUSTOM_SETTINGS = {
   blackWhite: true,
 }
 
+const DEFAULT_VIDEO_STATS = {
+  decoder: 'connecting',
+  fps: 0,
+  queue: 0,
+  dropped: 0,
+  status: 'connecting',
+}
+
 const loadCustomSettings = () => {
   try {
     return {
@@ -188,13 +196,10 @@ function App() {
   const [customSettings, setCustomSettings] = useState(loadCustomSettings)
   const [draftSettings, setDraftSettings] = useState(customSettings)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [videoStats, setVideoStats] = useState({
-    decoder: 'connecting',
-    fps: 0,
-    queue: 0,
-    dropped: 0,
-    status: 'connecting',
-  })
+  const [videoStats, setVideoStats] = useState(() => ({
+    ...DEFAULT_VIDEO_STATS,
+  }))
+  const [videoRefreshVersion, setVideoRefreshVersion] = useState(0)
   const [wifiStatus, setWifiStatus] = useState({})
   const [wifiNetworks, setWifiNetworks] = useState({
     networks: [],
@@ -334,7 +339,18 @@ function App() {
     return () => {
       videoPlayer.current?.destroy()
     }
-  }, [videoProfile, videoMode, customSettings, videoDecoder])
+  }, [
+    videoProfile,
+    videoMode,
+    customSettings,
+    videoDecoder,
+    videoRefreshVersion,
+  ])
+
+  const refreshVideo = useCallback(() => {
+    setVideoStats({ ...DEFAULT_VIDEO_STATS })
+    setVideoRefreshVersion(current => current + 1)
+  }, [])
 
   const initKeyBoard = () => {
     const onKeyDown = (e) => {
@@ -966,6 +982,15 @@ function App() {
             {gamepadText}
           </span>
         </div>
+        <button
+          className="VideoRefreshButton"
+          type="button"
+          onClick={refreshVideo}
+          title="重新连接视频图传"
+        >
+          <span aria-hidden="true">↻</span>
+          刷新图传
+        </button>
       </div>
       <VideoSettingsModal
         open={settingsOpen}
@@ -1016,6 +1041,7 @@ function App() {
           wifiText={wifiText}
           wifiWarning={Boolean(wifiStatus.error || wifiStatus.connected === false)}
           videoStats={videoStats}
+          onRefreshVideo={refreshVideo}
           onExitCockpit={toggleControlMode}
         />
       ) : (

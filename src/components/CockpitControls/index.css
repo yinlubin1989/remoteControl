@@ -31,6 +31,29 @@
     white-space: nowrap;
 }
 
+.CockpitTelemetry .CockpitVideoRefresh {
+    appearance: none;
+    display: grid;
+    place-items: center;
+    width: 25px;
+    min-width: 25px;
+    padding: 0;
+    pointer-events: auto;
+    touch-action: manipulation;
+    color: var(--cockpit-cyan);
+    background: rgba(3, 16, 21, 0.82);
+    border: 1px solid rgba(172, 249, 251, 0.34);
+    border-radius: 2px;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 15px;
+    line-height: 1;
+}
+
+.CockpitTelemetry .CockpitVideoRefresh:active {
+    color: #041218;
+    background: var(--cockpit-cyan);
+}
+
 .CockpitTelemetry span.warning,
 .CockpitTelemetry span.limited {
     color: #ffb37a;

@@ -15,6 +15,7 @@ const CockpitControls = ({
   wifiText,
   wifiWarning,
   videoStats,
+  onRefreshVideo,
   onExitCockpit,
 }) => {
   const steeringPointerRef = useRef(null)
@@ -220,6 +221,15 @@ const CockpitControls = ({
         <span className={isLimit ? 'limited' : ''}>
           {isLimit ? 'LIMIT ON' : 'LIMIT OFF'}
         </span>
+        <button
+          type="button"
+          className="CockpitVideoRefresh"
+          onClick={onRefreshVideo}
+          title="重新连接视频图传"
+          aria-label="刷新图传"
+        >
+          ↻
+        </button>
       </div>
 
       <div className={`CockpitThrottle${throttleActive ? ' active' : ''}`}>
