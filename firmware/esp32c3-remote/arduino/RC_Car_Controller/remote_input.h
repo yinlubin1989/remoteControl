@@ -12,6 +12,8 @@ constexpr uint16_t MIN_CALIBRATION_TRAVEL_US = 150;
 constexpr uint32_t SIGNAL_TIMEOUT_US = 100000;
 constexpr uint32_t CENTER_UNLOCK_MS = 500;
 constexpr uint32_t REPORT_INTERVAL_MS = 10;
+constexpr int16_t PWM_TELEMETRY_AXIS_SCALE = 32;
+constexpr int16_t PWM_TELEMETRY_INVALID_AXIS = -32768;
 
 struct AxisCalibration {
   AxisCalibration(
@@ -34,6 +36,16 @@ struct AxisCalibration {
 inline bool isPulseValid(uint32_t pulseUs) {
   return pulseUs >= MIN_VALID_PULSE_US
     && pulseUs <= MAX_VALID_PULSE_US;
+}
+
+inline int16_t encodePulseTelemetry(uint16_t pulseUs, bool signalValid) {
+  if (!signalValid || !isPulseValid(pulseUs)) {
+    return PWM_TELEMETRY_INVALID_AXIS;
+  }
+
+  return static_cast<int16_t>(
+    (static_cast<int32_t>(pulseUs) - 1500) * PWM_TELEMETRY_AXIS_SCALE
+  );
 }
 
 inline bool isCalibrationValid(const AxisCalibration& calibration) {

@@ -11,6 +11,7 @@ import {
   getDriveGamepadInput,
   getGamepadEmergencyLatched,
   getGamepadDriveOutput,
+  getReceiverPwmTelemetry,
   isDriveGamepad,
   isDriveGamepadIdentity,
 } from './gamepadControl'
@@ -77,6 +78,12 @@ const GAMEPAD_DRIVE_MODE_STORAGE_KEY = 'gamepad-drive-mode'
 const JOYSTICK_DEAD_ZONE = 4
 const VALID_DECODERS = ['webcodecs', 'broadway']
 const VALID_CONTROL_MODES = ['separate', 'joystick', 'cockpit']
+const EMPTY_RECEIVER_PWM_STATE = {
+  supported: false,
+  valid: false,
+  steeringPulse: null,
+  throttlePulse: null,
+}
 
 const loadDirectionSetting = (key) => (
   window.localStorage.getItem(key) === 'reverse'
@@ -184,6 +191,9 @@ function App() {
       : 'unsupported',
     id: '',
   }))
+  const [receiverPwmState, setReceiverPwmState] = useState(
+    EMPTY_RECEIVER_PWM_STATE,
+  )
   const [videoProfile, setVideoProfile] = useState(() => {
     const savedProfile = window.localStorage.getItem('video-profile')
     return ['low', 'wide', 'clear', 'full', 'custom'].includes(savedProfile)
@@ -615,6 +625,18 @@ function App() {
     let lastComfortButtonPressed = false
     let emergencyLatched = false
 
+    const updateReceiverPwm = gamepad => {
+      const next = getReceiverPwmTelemetry(gamepad)
+      setReceiverPwmState(current => (
+        current.supported === next.supported
+        && current.valid === next.valid
+        && current.steeringPulse === next.steeringPulse
+        && current.throttlePulse === next.throttlePulse
+          ? current
+          : next
+      ))
+    }
+
     const updateStatus = (status, id = '') => {
       setGamepadState(current => (
         current.status === status && current.id === id
@@ -669,6 +691,7 @@ function App() {
 
       if (!gamepad) {
         const incompatible = connectedGamepads[0]
+        updateReceiverPwm(null)
         lastComfortButtonPressed = false
         emergencyLatched = false
         neutralizeGamepad(
@@ -678,6 +701,8 @@ function App() {
         animationFrame = window.requestAnimationFrame(pollGamepad)
         return
       }
+
+      updateReceiverPwm(gamepad)
 
       if (suspended) {
         lastComfortButtonPressed = false
@@ -981,6 +1006,20 @@ function App() {
             <i aria-hidden="true" />
             {gamepadText}
           </span>
+          {receiverPwmState.supported && (
+            <span
+              className={[
+                'ReceiverPwmStatus',
+                receiverPwmState.valid ? 'valid' : 'invalid',
+              ].join(' ')}
+              title="接收机原始PWM脉宽"
+            >
+              PWM · 方向&nbsp;
+              {receiverPwmState.steeringPulse ?? '--'} μs
+              &nbsp;· 油门&nbsp;
+              {receiverPwmState.throttlePulse ?? '--'} μs
+            </span>
+          )}
         </div>
         <button
           className="VideoRefreshButton"

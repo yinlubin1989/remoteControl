@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict'
 import {
+  decodeReceiverPwmAxis,
   getComfortThrottleAxis,
   getDriveGamepadInput,
   getGamepadEmergencyLatched,
   getGamepadDriveOutput,
+  getReceiverPwmTelemetry,
   isDriveGamepad,
   isDriveGamepadIdentity,
   normalizeGamepadAxis,
 } from '../src/gamepadControl.js'
+
+const toBrowserAxis = rawAxis => (
+  rawAxis < 0 ? rawAxis / 32768 : rawAxis / 32767
+)
 
 assert.equal(normalizeGamepadAxis(0.08), 0)
 assert.equal(normalizeGamepadAxis(-0.04), 0)
@@ -121,6 +127,33 @@ assert.deepEqual(remoteInput, {
   comfortPressed: true,
   emergencyPressed: true,
 })
+
+assert.equal(decodeReceiverPwmAxis(-1), null)
+assert.equal(decodeReceiverPwmAxis(toBrowserAxis(-24000)), 750)
+assert.equal(decodeReceiverPwmAxis(0), 1500)
+assert.equal(decodeReceiverPwmAxis(toBrowserAxis(24000)), 2250)
+assert.deepEqual(getReceiverPwmTelemetry({
+  id: 'RC Car Controller (Vendor: 045e Product: 02fd)',
+  axes: [toBrowserAxis(-16000), 0, 0, toBrowserAxis(8000)],
+}), {
+  supported: true,
+  valid: true,
+  steeringPulse: 1000,
+  throttlePulse: 1750,
+})
+assert.deepEqual(getReceiverPwmTelemetry({
+  id: 'RC Car Controller',
+  axes: [-1, 0, 0, -1],
+}), {
+  supported: true,
+  valid: false,
+  steeringPulse: null,
+  throttlePulse: null,
+})
+assert.equal(getReceiverPwmTelemetry({
+  id: 'Xbox Wireless Controller',
+  axes: [0, 0, 0, 0],
+}).supported, false)
 assert.equal(getGamepadEmergencyLatched({
   emergencyPressed: true,
   leftY: -1,

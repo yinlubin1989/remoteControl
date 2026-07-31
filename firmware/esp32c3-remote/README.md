@@ -2,6 +2,8 @@
 
 该固件读取小飞象 X6F 接收机的 `CH1/CH2 PWM`，并把 ESP32-C3 SuperMini 模拟为 Xbox One S BLE 手柄。iPhone 配对后，本项目网页继续通过 Gamepad API 和 Socket.IO 控制小车。
 
+固件同时通过未参与控车的手柄轴上报 CH1/CH2 原始脉宽；网页连接 `RC Car Controller` 后会显示方向和油门的实时 PWM 微秒值，信号丢失时显示 `--`。
+
 ## 硬件
 
 - ESP32-C3 SuperMini

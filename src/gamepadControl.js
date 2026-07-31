@@ -1,6 +1,11 @@
 export const GAMEPAD_AXIS_DEAD_ZONE = 0.08
 export const GAMEPAD_COMFORT_FULL_RAMP_MS = 4000
 export const REMOTE_CONTROL_GAMEPAD_NAME = 'RC Car Controller'
+export const PWM_TELEMETRY_AXIS_SCALE = 32
+
+const PWM_TELEMETRY_INVALID_THRESHOLD = -0.95
+const PWM_TELEMETRY_MIN_US = 750
+const PWM_TELEMETRY_MAX_US = 2250
 
 const GAMEPAD_COMFORT_RAMP_POINTS = [
   { elapsedMs: 0, magnitude: 0 },
@@ -83,6 +88,43 @@ export const getDriveGamepadInput = gamepad => ({
   comfortPressed: isButtonPressed(gamepad?.buttons?.[10]),
   emergencyPressed: isButtonPressed(gamepad?.buttons?.[11]),
 })
+
+export const decodeReceiverPwmAxis = axisValue => {
+  if (!Number.isFinite(axisValue)) return null
+  const axis = clamp(axisValue, -1, 1)
+  if (axis <= PWM_TELEMETRY_INVALID_THRESHOLD) return null
+
+  const rawAxis = axis < 0 ? axis * 32768 : axis * 32767
+  return clamp(
+    Math.round(1500 + rawAxis / PWM_TELEMETRY_AXIS_SCALE),
+    PWM_TELEMETRY_MIN_US,
+    PWM_TELEMETRY_MAX_US,
+  )
+}
+
+export const getReceiverPwmTelemetry = gamepad => {
+  const supported = Boolean(
+    gamepad?.id?.includes(REMOTE_CONTROL_GAMEPAD_NAME)
+    && gamepad.axes?.length >= 4,
+  )
+  if (!supported) {
+    return {
+      supported: false,
+      valid: false,
+      steeringPulse: null,
+      throttlePulse: null,
+    }
+  }
+
+  const steeringPulse = decodeReceiverPwmAxis(gamepad.axes[0])
+  const throttlePulse = decodeReceiverPwmAxis(gamepad.axes[3])
+  return {
+    supported: true,
+    valid: steeringPulse !== null && throttlePulse !== null,
+    steeringPulse,
+    throttlePulse,
+  }
+}
 
 export const getGamepadEmergencyLatched = ({
   latched = false,

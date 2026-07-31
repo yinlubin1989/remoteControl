@@ -148,6 +148,19 @@ body,
 .GamepadStatus--unsupported {
     color: #ffb37a;
 }
+.ReceiverPwmStatus {
+    display: inline-flex;
+    align-items: center;
+    color: #6f9299;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    white-space: nowrap;
+}
+.ReceiverPwmStatus.valid {
+    color: #8fffb2;
+}
+.ReceiverPwmStatus.invalid {
+    color: #ffb37a;
+}
 @keyframes gamepad-status-pulse {
     from { opacity: 0.45; }
     to { opacity: 1; }

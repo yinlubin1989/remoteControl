@@ -14,6 +14,20 @@ void test_pulse_validation_and_mapping() {
   TEST_ASSERT_EQUAL_INT16(32767, remote_input::mapPulse(2000, calibration));
 }
 
+void test_pulse_telemetry_encoding() {
+  TEST_ASSERT_EQUAL_INT16(
+    remote_input::PWM_TELEMETRY_INVALID_AXIS,
+    remote_input::encodePulseTelemetry(1500, false)
+  );
+  TEST_ASSERT_EQUAL_INT16(
+    remote_input::PWM_TELEMETRY_INVALID_AXIS,
+    remote_input::encodePulseTelemetry(700, true)
+  );
+  TEST_ASSERT_EQUAL_INT16(-24000, remote_input::encodePulseTelemetry(750, true));
+  TEST_ASSERT_EQUAL_INT16(0, remote_input::encodePulseTelemetry(1500, true));
+  TEST_ASSERT_EQUAL_INT16(24000, remote_input::encodePulseTelemetry(2250, true));
+}
+
 void test_asymmetric_calibration_mapping() {
   const remote_input::AxisCalibration calibration {
     900,
@@ -74,6 +88,7 @@ void test_calibration_capture() {
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_pulse_validation_and_mapping);
+  RUN_TEST(test_pulse_telemetry_encoding);
   RUN_TEST(test_asymmetric_calibration_mapping);
   RUN_TEST(test_median_filter);
   RUN_TEST(test_signal_timeout_and_report_interval);

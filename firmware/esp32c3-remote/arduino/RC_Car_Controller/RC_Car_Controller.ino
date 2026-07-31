@@ -325,8 +325,16 @@ void sendControllerReport(
     );
   }
 
-  gamepad->setLeftThumb(0, throttleAxis);
-  gamepad->setRightThumb(steeringAxis, 0);
+  const int16_t steeringPulseAxis = remote_input::encodePulseTelemetry(
+    input.steeringPulseUs,
+    input.valid
+  );
+  const int16_t throttlePulseAxis = remote_input::encodePulseTelemetry(
+    input.throttlePulseUs,
+    input.valid
+  );
+  gamepad->setLeftThumb(steeringPulseAxis, throttleAxis);
+  gamepad->setRightThumb(steeringAxis, throttlePulseAxis);
   gamepad->sendGamepadReport();
   lastReportMs = nowMs;
 }
