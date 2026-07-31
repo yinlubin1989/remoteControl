@@ -23,9 +23,9 @@ void test_pulse_telemetry_encoding() {
     remote_input::PWM_TELEMETRY_INVALID_AXIS,
     remote_input::encodePulseTelemetry(700, true)
   );
-  TEST_ASSERT_EQUAL_INT16(-24000, remote_input::encodePulseTelemetry(750, true));
-  TEST_ASSERT_EQUAL_INT16(0, remote_input::encodePulseTelemetry(1500, true));
-  TEST_ASSERT_EQUAL_INT16(24000, remote_input::encodePulseTelemetry(2250, true));
+  TEST_ASSERT_EQUAL_INT16(1000, remote_input::encodePulseTelemetry(750, true));
+  TEST_ASSERT_EQUAL_INT16(16000, remote_input::encodePulseTelemetry(1500, true));
+  TEST_ASSERT_EQUAL_INT16(31000, remote_input::encodePulseTelemetry(2250, true));
 }
 
 void test_asymmetric_calibration_mapping() {

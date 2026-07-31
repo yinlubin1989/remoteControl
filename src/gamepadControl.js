@@ -1,9 +1,9 @@
 export const GAMEPAD_AXIS_DEAD_ZONE = 0.08
 export const GAMEPAD_COMFORT_FULL_RAMP_MS = 4000
 export const REMOTE_CONTROL_GAMEPAD_NAME = 'RC Car Controller'
-export const PWM_TELEMETRY_AXIS_SCALE = 32
+export const PWM_TELEMETRY_AXIS_SCALE = 20
 
-const PWM_TELEMETRY_INVALID_THRESHOLD = -0.95
+const PWM_TELEMETRY_AXIS_OFFSET = 1000
 const PWM_TELEMETRY_MIN_US = 750
 const PWM_TELEMETRY_MAX_US = 2250
 
@@ -92,11 +92,15 @@ export const getDriveGamepadInput = gamepad => ({
 export const decodeReceiverPwmAxis = axisValue => {
   if (!Number.isFinite(axisValue)) return null
   const axis = clamp(axisValue, -1, 1)
-  if (axis <= PWM_TELEMETRY_INVALID_THRESHOLD) return null
+  if (axis <= 0) return null
 
-  const rawAxis = axis < 0 ? axis * 32768 : axis * 32767
+  const rawAxis = axis * 32767
   return clamp(
-    Math.round(1500 + rawAxis / PWM_TELEMETRY_AXIS_SCALE),
+    Math.round(
+      PWM_TELEMETRY_MIN_US
+        + (rawAxis - PWM_TELEMETRY_AXIS_OFFSET)
+          / PWM_TELEMETRY_AXIS_SCALE,
+    ),
     PWM_TELEMETRY_MIN_US,
     PWM_TELEMETRY_MAX_US,
   )

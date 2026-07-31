@@ -129,12 +129,13 @@ assert.deepEqual(remoteInput, {
 })
 
 assert.equal(decodeReceiverPwmAxis(-1), null)
-assert.equal(decodeReceiverPwmAxis(toBrowserAxis(-24000)), 750)
-assert.equal(decodeReceiverPwmAxis(0), 1500)
-assert.equal(decodeReceiverPwmAxis(toBrowserAxis(24000)), 2250)
+assert.equal(decodeReceiverPwmAxis(0), null)
+assert.equal(decodeReceiverPwmAxis(toBrowserAxis(1000)), 750)
+assert.equal(decodeReceiverPwmAxis(toBrowserAxis(16000)), 1500)
+assert.equal(decodeReceiverPwmAxis(toBrowserAxis(31000)), 2250)
 assert.deepEqual(getReceiverPwmTelemetry({
   id: 'RC Car Controller (Vendor: 045e Product: 02fd)',
-  axes: [toBrowserAxis(-16000), 0, 0, toBrowserAxis(8000)],
+  axes: [toBrowserAxis(6000), 0, 0, toBrowserAxis(21000)],
 }), {
   supported: true,
   valid: true,
