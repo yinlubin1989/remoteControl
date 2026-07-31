@@ -26,15 +26,20 @@ struct PwmCapture {
 
 struct ReceiverInput {
   ReceiverInput(
-    bool inputValid = false,
+    bool steeringSignalValid = false,
+    bool throttleSignalValid = false,
     uint16_t steeringPulse = 1500,
     uint16_t throttlePulse = 1500
   )
-    : valid(inputValid),
+    : valid(steeringSignalValid && throttleSignalValid),
+      steeringValid(steeringSignalValid),
+      throttleValid(throttleSignalValid),
       steeringPulseUs(steeringPulse),
       throttlePulseUs(throttlePulse) {}
 
   bool valid;
+  bool steeringValid;
+  bool throttleValid;
   uint16_t steeringPulseUs;
   uint16_t throttlePulseUs;
 };
@@ -116,9 +121,17 @@ ReceiverInput readReceiverInput(uint32_t nowUs) {
     lastThrottleUpdateUs = throttleUpdatedUs;
   }
 
+  const bool steeringValid = !remote_input::signalTimedOut(
+    nowUs,
+    steeringUpdatedUs
+  );
+  const bool throttleValid = !remote_input::signalTimedOut(
+    nowUs,
+    throttleUpdatedUs
+  );
   return ReceiverInput(
-    !remote_input::signalTimedOut(nowUs, steeringUpdatedUs)
-      && !remote_input::signalTimedOut(nowUs, throttleUpdatedUs),
+    steeringValid,
+    throttleValid,
     filteredSteeringPulseUs,
     filteredThrottlePulseUs
   );
@@ -205,7 +218,13 @@ void updateCalibration(
       static_cast<uint32_t>(nowMs - lastStatusPrintMs)
       >= STATUS_PRINT_INTERVAL_MS
     ) {
-      Serial.println("Waiting for valid CH1 and CH2 PWM signals...");
+      Serial.printf(
+        "PWM CH1: %s (%u us), CH2: %s (%u us)\n",
+        input.steeringValid ? "OK" : "--",
+        input.steeringPulseUs,
+        input.throttleValid ? "OK" : "--",
+        input.throttlePulseUs
+      );
       lastStatusPrintMs = nowMs;
     }
     return;
@@ -327,11 +346,11 @@ void sendControllerReport(
 
   const int16_t steeringPulseAxis = remote_input::encodePulseTelemetry(
     input.steeringPulseUs,
-    input.valid
+    input.steeringValid
   );
   const int16_t throttlePulseAxis = remote_input::encodePulseTelemetry(
     input.throttlePulseUs,
-    input.valid
+    input.throttleValid
   );
   gamepad->setLeftThumb(steeringPulseAxis, throttleAxis);
   gamepad->setRightThumb(steeringAxis, throttlePulseAxis);
