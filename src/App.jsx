@@ -3,11 +3,7 @@ import io from 'socket.io-client'
 import LowLatencyVideoPlayer from './LowLatencyVideoPlayer'
 import CrossHandle from './components/CrossHandle'
 import SliderHandle from './components/SliderHandle'
-import CarJoystick from './components/CarJoystick'
-import CockpitControls from './components/CockpitControls'
-import { applyCockpitSteeringCurve } from './components/CockpitControls/controlMath'
 import {
-  getComfortThrottleAxis,
   getDriveGamepadInput,
   getGamepadEmergencyLatched,
   getGamepadDriveOutput,
@@ -73,11 +69,7 @@ const STEERING_DIRECTION_KEY = 'steering-direction'
 const STEERING_CENTER_KEY = 'steering-center-pulse'
 const MOTOR_DIRECTION_KEY = 'motor-direction'
 const DECODER_STORAGE_KEY = 'video-decoder'
-const CONTROL_MODE_STORAGE_KEY = 'car-control-mode'
-const GAMEPAD_DRIVE_MODE_STORAGE_KEY = 'gamepad-drive-mode'
-const JOYSTICK_DEAD_ZONE = 4
 const VALID_DECODERS = ['webcodecs', 'broadway']
-const VALID_CONTROL_MODES = ['separate', 'joystick', 'cockpit']
 const EMPTY_RECEIVER_PWM_STATE = {
   supported: false,
   valid: false,
@@ -108,17 +100,6 @@ const loadVideoDecoder = () => {
 
   const savedDecoder = window.localStorage.getItem(DECODER_STORAGE_KEY)
   return VALID_DECODERS.includes(savedDecoder) ? savedDecoder : 'webcodecs'
-}
-
-const applyJoystickDeadZone = (value) => {
-  const offset = value - 50
-  const distance = Math.abs(offset)
-  if (distance <= JOYSTICK_DEAD_ZONE) return 50
-
-  const adjustedDistance = (
-    (distance - JOYSTICK_DEAD_ZONE) / (50 - JOYSTICK_DEAD_ZONE)
-  ) * 50
-  return 50 + Math.sign(offset) * adjustedDistance
 }
 
 const getGamepadDisplayName = id => (
@@ -162,13 +143,6 @@ function App() {
   const videoPlayer = useRef()
   const [pannel, setPannel] = useState('')
   const [isLimit, setIsLimit] = useState(false)
-  const [gamepadComfortMode, setGamepadComfortMode] = useState(() => (
-    window.localStorage.getItem(GAMEPAD_DRIVE_MODE_STORAGE_KEY) === 'comfort'
-  ))
-  const [controlMode, setControlMode] = useState(() => {
-    const savedMode = window.localStorage.getItem(CONTROL_MODE_STORAGE_KEY)
-    return VALID_CONTROL_MODES.includes(savedMode) ? savedMode : 'separate'
-  })
   const [steeringReversed, setSteeringReversed] = useState(() => (
     loadDirectionSetting(STEERING_DIRECTION_KEY)
   ))
@@ -180,11 +154,8 @@ function App() {
   const steeringReversedRef = useRef(steeringReversed)
   const steeringCenterRef = useRef(steeringCenter)
   const motorReversedRef = useRef(motorReversed)
-  const controlModeRef = useRef(controlMode)
   const isLimitRef = useRef(isLimit)
   const gamepadActiveRef = useRef(false)
-  const gamepadComfortModeRef = useRef(gamepadComfortMode)
-  const cockpitTravelDirectionRef = useRef('D')
   const [gamepadState, setGamepadState] = useState(() => ({
     status: typeof navigator.getGamepads === 'function'
       ? 'disconnected'
@@ -247,10 +218,6 @@ function App() {
           : gamepadName
             ? `手柄已断开 · ${gamepadName}`
             : '手柄未连接'
-
-  useEffect(() => {
-    controlModeRef.current = controlMode
-  }, [controlMode])
 
   useEffect(() => {
     isLimitRef.current = isLimit
@@ -364,10 +331,7 @@ function App() {
 
   const initKeyBoard = () => {
     const onKeyDown = (e) => {
-      if (
-        controlModeRef.current !== 'separate'
-        || gamepadActiveRef.current
-      ) return
+      if (gamepadActiveRef.current) return
       if (e.key === ' ') {
         onTouchThrottle()
       }
@@ -379,10 +343,7 @@ function App() {
       }
     }
     const onKeyUp = (e) => {
-      if (
-        controlModeRef.current !== 'separate'
-        || gamepadActiveRef.current
-      ) return
+      if (gamepadActiveRef.current) return
       if (e.key === ' ') {
         onTouchEndThrottle()
       }
@@ -550,67 +511,6 @@ function App() {
     setIsLimit(e)
   }
 
-  const toggleGamepadComfortMode = () => {
-    setGamepadComfortMode(current => {
-      const next = !current
-      gamepadComfortModeRef.current = next
-      window.localStorage.setItem(
-        GAMEPAD_DRIVE_MODE_STORAGE_KEY,
-        next ? 'comfort' : 'sport',
-      )
-      return next
-    })
-  }
-
-  const toggleControlMode = () => {
-    neutralizeCockpit()
-    setControlMode(current => {
-      const currentIndex = VALID_CONTROL_MODES.indexOf(current)
-      const nextMode = VALID_CONTROL_MODES[
-        (currentIndex + 1) % VALID_CONTROL_MODES.length
-      ]
-      window.localStorage.setItem(CONTROL_MODE_STORAGE_KEY, nextMode)
-      return nextMode
-    })
-  }
-
-  const handleJoystickChange = useCallback(({ x, y, active }) => {
-    if (controlMode !== 'joystick' || gamepadActiveRef.current) return
-
-    const steering = applyJoystickDeadZone(x)
-    const throttle = applyJoystickDeadZone(y)
-    pwmChange(14, 100 - steering)
-    if (!active || throttle === 50) {
-      setThrottleNeutral()
-      return
-    }
-
-    const throttlePercent = Math.abs(throttle - 50) * 2
-    const pwmOffset = throttlePercent * (
-      isLimit ? (throttle < 50 ? 2.5 : 2) : 5
-    )
-    const pwm = throttle < 50
-      ? THROTTLE_NEUTRAL - pwmOffset
-      : THROTTLE_NEUTRAL + pwmOffset
-
-    socket.emit('setPulseLength', {
-      pin: 15,
-      data: getMotorPulse(pwm),
-    })
-  }, [controlMode, isLimit])
-
-  const neutralizeCockpit = useCallback(() => {
-    if (gamepadActiveRef.current) return
-    socket.emit('setPulseLength', {
-      pin: 15,
-      data: THROTTLE_NEUTRAL,
-    })
-    socket.emit('setPulseLength', {
-      pin: 14,
-      data: steeringCenterRef.current,
-    })
-  }, [])
-
   useEffect(() => {
     if (typeof navigator.getGamepads !== 'function') return undefined
 
@@ -620,9 +520,6 @@ function App() {
     let lastSteeringPulse
     let lastThrottlePulse
     let lastGamepadId = ''
-    let lastPollAt
-    let appliedThrottleAxis = 0
-    let lastComfortButtonPressed = false
     let emergencyLatched = false
 
     const updateReceiverPwm = gamepad => {
@@ -660,8 +557,6 @@ function App() {
       gamepadActiveRef.current = false
       lastSteeringPulse = undefined
       lastThrottlePulse = undefined
-      lastPollAt = undefined
-      appliedThrottleAxis = 0
       updateStatus(status, id)
     }
 
@@ -680,8 +575,6 @@ function App() {
       gamepadActiveRef.current = false
       lastThrottlePulse = THROTTLE_NEUTRAL
       lastSteeringPulse = steeringCenterRef.current
-      lastPollAt = undefined
-      appliedThrottleAxis = 0
       updateStatus('emergency', id)
     }
 
@@ -692,7 +585,6 @@ function App() {
       if (!gamepad) {
         const incompatible = connectedGamepads[0]
         updateReceiverPwm(null)
-        lastComfortButtonPressed = false
         emergencyLatched = false
         neutralizeGamepad(
           incompatible ? 'incompatible' : 'disconnected',
@@ -705,7 +597,6 @@ function App() {
       updateReceiverPwm(gamepad)
 
       if (suspended) {
-        lastComfortButtonPressed = false
         emergencyLatched = false
         neutralizeGamepad('connected', gamepad.id)
         animationFrame = window.requestAnimationFrame(pollGamepad)
@@ -721,26 +612,21 @@ function App() {
         rightX: input.rightX,
       })
       if (emergencyLatched) {
-        lastComfortButtonPressed = input.comfortPressed
         if (!wasEmergencyLatched) engageEmergencyStop(gamepad.id)
         else updateStatus('emergency', gamepad.id)
         animationFrame = window.requestAnimationFrame(pollGamepad)
         return
       }
       if (wasEmergencyLatched) {
-        lastComfortButtonPressed = input.comfortPressed
         neutralizeGamepad('connected', gamepad.id)
         animationFrame = window.requestAnimationFrame(pollGamepad)
         return
       }
-      if (input.comfortPressed && !lastComfortButtonPressed) {
-        toggleGamepadComfortMode()
-      }
-      lastComfortButtonPressed = input.comfortPressed
 
-      const targetOutput = getGamepadDriveOutput({
+      const output = getGamepadDriveOutput({
         leftY: input.leftY,
         rightX: input.rightX,
+        throttleLimitPercent: refSpeed.current,
         isLimit: isLimitRef.current,
         steeringCenter: steeringCenterRef.current,
         steeringReversed: steeringReversedRef.current,
@@ -748,32 +634,11 @@ function App() {
       })
       lastGamepadId = gamepad.id
 
-      if (!targetOutput.active) {
+      if (!output.active) {
         neutralizeGamepad('connected', gamepad.id)
         animationFrame = window.requestAnimationFrame(pollGamepad)
         return
       }
-
-      const elapsedMs = lastPollAt === undefined
-        ? 0
-        : Math.min(100, timestamp - lastPollAt)
-      lastPollAt = timestamp
-      appliedThrottleAxis = getComfortThrottleAxis({
-        currentAxis: appliedThrottleAxis,
-        targetAxis: targetOutput.throttleAxis,
-        elapsedMs,
-        enabled: gamepadComfortModeRef.current,
-      })
-      const output = getGamepadDriveOutput({
-        leftY: input.leftY,
-        rightX: input.rightX,
-        appliedThrottleAxis,
-        throttleLimitPercent: refSpeed.current,
-        isLimit: isLimitRef.current,
-        steeringCenter: steeringCenterRef.current,
-        steeringReversed: steeringReversedRef.current,
-        motorReversed: motorReversedRef.current,
-      })
 
       gamepadActiveRef.current = true
       updateStatus('active', gamepad.id)
@@ -802,7 +667,6 @@ function App() {
     const suspendGamepad = () => {
       suspended = true
       const gamepad = readGamepads().find(isDriveGamepad)
-      lastComfortButtonPressed = false
       emergencyLatched = false
       neutralizeGamepad(
         gamepad ? 'connected' : 'disconnected',
@@ -818,7 +682,6 @@ function App() {
     }
     const onGamepadDisconnected = event => {
       if (isDriveGamepadIdentity(event.gamepad)) {
-        lastComfortButtonPressed = false
         emergencyLatched = false
         neutralizeGamepad('disconnected', event.gamepad.id)
       }
@@ -839,89 +702,6 @@ function App() {
       neutralizeGamepad('disconnected', lastGamepadId)
     }
   }, [])
-
-  const handleCockpitSteeringChange = useCallback((value, active) => {
-    if (controlMode !== 'cockpit' || gamepadActiveRef.current) return
-    if (!active) {
-      pwmChange(14, 50)
-      return
-    }
-
-    const steering = applyCockpitSteeringCurve(value)
-    pwmChange(14, 100 - steering)
-  }, [controlMode])
-
-  const handleCockpitThrottleChange = useCallback((value, active) => {
-    if (controlMode !== 'cockpit' || gamepadActiveRef.current) return
-
-    const throttle = applyJoystickDeadZone(value)
-    if (!active || throttle === 50) {
-      setThrottleNeutral()
-      return
-    }
-
-    cockpitTravelDirectionRef.current = throttle < 50 ? 'D' : 'R'
-    const throttlePercent = Math.abs(throttle - 50) * 2
-    const pwmOffset = throttlePercent * (
-      isLimit ? (throttle < 50 ? 2.5 : 2) : 5
-    )
-    const pwm = throttle < 50
-      ? THROTTLE_NEUTRAL - pwmOffset
-      : THROTTLE_NEUTRAL + pwmOffset
-
-    socket.emit('setPulseLength', {
-      pin: 15,
-      data: getMotorPulse(pwm),
-    })
-  }, [controlMode, isLimit])
-
-  const handleCockpitBrake = useCallback(active => {
-    if (controlMode !== 'cockpit' || gamepadActiveRef.current) return
-    if (!active) {
-      setThrottleNeutral()
-      return
-    }
-
-    const pwm = cockpitTravelDirectionRef.current === 'R'
-      ? THROTTLE_NEUTRAL - BRAKE_PWM_OFFSET
-      : THROTTLE_NEUTRAL + BRAKE_PWM_OFFSET
-    socket.emit('setPulseLength', {
-      pin: 15,
-      data: getMotorPulse(pwm),
-    })
-  }, [controlMode])
-
-  useEffect(() => {
-    if (controlMode !== 'cockpit') return undefined
-
-    const landscapeMedia = window.matchMedia('(orientation: landscape)')
-    const stopForOrientation = event => {
-      if (!event.matches) neutralizeCockpit()
-    }
-    const stopForVisibility = () => {
-      if (document.hidden) neutralizeCockpit()
-    }
-
-    window.addEventListener('blur', neutralizeCockpit)
-    document.addEventListener('visibilitychange', stopForVisibility)
-    if (landscapeMedia.addEventListener) {
-      landscapeMedia.addEventListener('change', stopForOrientation)
-    } else {
-      landscapeMedia.addListener(stopForOrientation)
-    }
-    if (!landscapeMedia.matches) neutralizeCockpit()
-
-    return () => {
-      window.removeEventListener('blur', neutralizeCockpit)
-      document.removeEventListener('visibilitychange', stopForVisibility)
-      if (landscapeMedia.removeEventListener) {
-        landscapeMedia.removeEventListener('change', stopForOrientation)
-      } else {
-        landscapeMedia.removeListener(stopForOrientation)
-      }
-      neutralizeCockpit()
-    }
-  }, [controlMode, neutralizeCockpit])
 
   const usePseudoFullscreen = isIOSDevice() || (
     new URLSearchParams(window.location.search).get('fullscreen') === 'pseudo'
@@ -974,7 +754,6 @@ function App() {
         'App',
         isFullScreen ? 'fullScreen' : '',
         isFullScreen && usePseudoFullscreen ? 'pseudoFullScreen' : '',
-        controlMode === 'cockpit' ? 'cockpitMode' : '',
       ].filter(Boolean).join(' ')}
     >
       <div
@@ -1064,60 +843,36 @@ function App() {
         fullScreen={fullScreen}
         isFullScreen={isFullScreen}
         openVideoSettings={openVideoSettings}
-        controlMode={controlMode}
-        toggleControlMode={toggleControlMode}
-        gamepadComfortMode={gamepadComfortMode}
-        toggleGamepadComfortMode={toggleGamepadComfortMode}
       />
-      {controlMode === 'joystick' ? (
-        <CarJoystick onChange={handleJoystickChange} />
-      ) : controlMode === 'cockpit' ? (
-        <CockpitControls
-          onSteeringChange={handleCockpitSteeringChange}
-          onThrottleChange={handleCockpitThrottleChange}
-          onBrake={handleCockpitBrake}
-          isLimit={isLimit}
-          wifiText={wifiText}
-          wifiWarning={Boolean(wifiStatus.error || wifiStatus.connected === false)}
-          videoStats={videoStats}
-          onRefreshVideo={refreshVideo}
-          onExitCockpit={toggleControlMode}
+      <div className="Console">
+        <SliderHandle
+          onChange={speedChange}
+          title="速度"
+          defalutValue={0}
+          width="20vw"
+          className="SpeedSlider"
         />
-      ) : (
-        <div className="Console">
-          <SliderHandle
-            onChange={speedChange}
-            title="速度"
-            defalutValue={0}
-            width="20vw"
-            className="SpeedSlider"
-          />
-          <a className="Start"
-            onTouchStart={onTouchThrottle}
-            onTouchEnd={onTouchEndThrottle}
-            onTouchCancel={onTouchEndThrottle}
-          >油门</a>
-          <a className="Brake"
-            onTouchStart={onTouchBrake}
-            onTouchEnd={onTouchEndThrottle}
-            onTouchCancel={onTouchEndThrottle}
-          >stop</a>
-          <Gear onChange={gearChange}/>
-          <Direction onChange={e => {
-            if (!gamepadActiveRef.current) pwmChange(14, 100 - e)
-          }}/>
-        </div>
-      )}
-      {controlMode !== 'cockpit' && (
-        <>
-          <br />
-          <div className="Arm">
-            <CrossHandle onChange={e => {
-              pwmChange(13, e.armX)
-            }}/>
-          </div>
-        </>
-      )}
+        <a className="Start"
+          onTouchStart={onTouchThrottle}
+          onTouchEnd={onTouchEndThrottle}
+          onTouchCancel={onTouchEndThrottle}
+        >油门</a>
+        <a className="Brake"
+          onTouchStart={onTouchBrake}
+          onTouchEnd={onTouchEndThrottle}
+          onTouchCancel={onTouchEndThrottle}
+        >stop</a>
+        <Gear onChange={gearChange}/>
+        <Direction onChange={e => {
+          if (!gamepadActiveRef.current) pwmChange(14, 100 - e)
+        }}/>
+      </div>
+      <br />
+      <div className="Arm">
+        <CrossHandle onChange={e => {
+          pwmChange(13, e.armX)
+        }}/>
+      </div>
     </div>
   )
 }
