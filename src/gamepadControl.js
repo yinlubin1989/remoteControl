@@ -36,6 +36,43 @@ export const isDriveGamepad = gamepad => Boolean(
   gamepad?.connected && isDriveGamepadIdentity(gamepad)
 )
 
+export const readGamepadSnapshot = getGamepads => {
+  if (typeof getGamepads !== 'function') {
+    return {
+      status: 'unsupported',
+      gamepad: null,
+      id: '',
+    }
+  }
+
+  try {
+    const connectedGamepads = Array.from(getGamepads() || [])
+      .filter(gamepad => gamepad?.connected)
+    const gamepad = connectedGamepads.find(isDriveGamepad)
+    if (gamepad) {
+      return {
+        status: 'connected',
+        gamepad,
+        id: gamepad.id || '',
+      }
+    }
+
+    const incompatible = connectedGamepads[0]
+    return {
+      status: incompatible ? 'incompatible' : 'waiting',
+      gamepad: null,
+      id: incompatible?.id || '',
+    }
+  } catch (error) {
+    return {
+      status: 'blocked',
+      gamepad: null,
+      id: '',
+      error,
+    }
+  }
+}
+
 const isButtonPressed = button => Boolean(
   button?.pressed || button?.value > 0.5
 )

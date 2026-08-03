@@ -8,8 +8,8 @@ import {
   getGamepadEmergencyLatched,
   getGamepadDriveOutput,
   getReceiverPwmTelemetry,
-  isDriveGamepad,
   isDriveGamepadIdentity,
+  readGamepadSnapshot,
 } from './gamepadControl'
 import Keybords from './components/Keybords'
 import Gear from './components/Gear'
@@ -70,6 +70,7 @@ const STEERING_CENTER_KEY = 'steering-center-pulse'
 const MOTOR_DIRECTION_KEY = 'motor-direction'
 const DECODER_STORAGE_KEY = 'video-decoder'
 const VALID_DECODERS = ['webcodecs', 'broadway']
+const GAMEPAD_DISCOVERY_INTERVAL_MS = 250
 const EMPTY_RECEIVER_PWM_STATE = {
   supported: false,
   valid: false,
@@ -158,7 +159,7 @@ function App() {
   const gamepadActiveRef = useRef(false)
   const [gamepadState, setGamepadState] = useState(() => ({
     status: typeof navigator.getGamepads === 'function'
-      ? 'disconnected'
+      ? 'waiting'
       : 'unsupported',
     id: '',
   }))
@@ -209,15 +210,22 @@ function App() {
     ? `手柄接管中 · ${gamepadName}`
     : gamepadState.status === 'emergency'
       ? `遥控器急停 · 回中解锁 · ${gamepadName}`
-    : gamepadState.status === 'connected'
-      ? `手柄已连接 · ${gamepadName}`
-      : gamepadState.status === 'incompatible'
-        ? `手柄不兼容 · ${gamepadName}`
-        : gamepadState.status === 'unsupported'
-          ? '浏览器不支持手柄'
-          : gamepadName
-            ? `手柄已断开 · ${gamepadName}`
-            : '手柄未连接'
+      : gamepadState.status === 'connected'
+        ? `手柄已连接 · ${gamepadName}`
+        : gamepadState.status === 'waiting'
+          ? '等待手柄输入 · 请拨动遥控器'
+          : gamepadState.status === 'incompatible'
+            ? `手柄不兼容 · ${gamepadName}`
+            : gamepadState.status === 'unsupported'
+              ? '浏览器不支持手柄'
+              : gamepadState.status === 'blocked'
+                ? '手柄访问受限'
+                : gamepadName
+                  ? `手柄已断开 · ${gamepadName}`
+                  : '手柄已断开'
+  const gamepadTitle = gamepadState.status === 'waiting'
+    ? '如未识别，请先将方向和油门回中，再拨动方向或油门'
+    : gamepadState.id || gamepadText
 
   useEffect(() => {
     isLimitRef.current = isLimit
@@ -512,15 +520,16 @@ function App() {
   }
 
   useEffect(() => {
-    if (typeof navigator.getGamepads !== 'function') return undefined
-
     let animationFrame
-    let suspended = document.hidden
+    let discoveryTimer
+    let monitoring = false
+    let destroyed = false
     let lastEmitAt = 0
     let lastSteeringPulse
     let lastThrottlePulse
     let lastGamepadId = ''
     let emergencyLatched = false
+    let confirmedDisconnected = false
 
     const updateReceiverPwm = gamepad => {
       const next = getReceiverPwmTelemetry(gamepad)
@@ -543,7 +552,6 @@ function App() {
     }
 
     const neutralizeGamepad = (status, id = '') => {
-      if (id) lastGamepadId = id
       if (gamepadActiveRef.current) {
         socket.emit('setPulseLength', {
           pin: 15,
@@ -560,8 +568,22 @@ function App() {
       updateStatus(status, id)
     }
 
-    const readGamepads = () => Array.from(navigator.getGamepads() || [])
-      .filter(gamepad => gamepad?.connected)
+    const readSnapshot = () => readGamepadSnapshot(
+      typeof navigator.getGamepads === 'function'
+        ? () => navigator.getGamepads()
+        : undefined,
+    )
+
+    const cancelScheduledMonitoring = () => {
+      if (animationFrame !== undefined) {
+        window.cancelAnimationFrame(animationFrame)
+        animationFrame = undefined
+      }
+      if (discoveryTimer !== undefined) {
+        window.clearTimeout(discoveryTimer)
+        discoveryTimer = undefined
+      }
+    }
 
     const engageEmergencyStop = id => {
       socket.emit('setPulseLength', {
@@ -578,30 +600,52 @@ function App() {
       updateStatus('emergency', id)
     }
 
+    const unavailableStatus = snapshot => (
+      snapshot.status === 'waiting' && confirmedDisconnected
+        ? 'disconnected'
+        : snapshot.status
+    )
+
+    const handleUnavailableSnapshot = snapshot => {
+      updateReceiverPwm(null)
+      emergencyLatched = false
+      neutralizeGamepad(
+        unavailableStatus(snapshot),
+        snapshot.id || lastGamepadId,
+      )
+    }
+
+    const scheduleControlFrame = callback => {
+      if (destroyed || !monitoring || document.hidden) return
+      animationFrame = window.requestAnimationFrame(callback)
+    }
+
+    const scheduleDiscovery = (delay = GAMEPAD_DISCOVERY_INTERVAL_MS) => {
+      if (destroyed || !monitoring || document.hidden) return
+      if (discoveryTimer !== undefined) {
+        window.clearTimeout(discoveryTimer)
+      }
+      discoveryTimer = window.setTimeout(() => {
+        discoveryTimer = undefined
+        scanGamepad()
+      }, delay)
+    }
+
     const pollGamepad = timestamp => {
-      const connectedGamepads = readGamepads()
-      const gamepad = connectedGamepads.find(isDriveGamepad)
+      animationFrame = undefined
+      if (destroyed || !monitoring || document.hidden) return
 
-      if (!gamepad) {
-        const incompatible = connectedGamepads[0]
-        updateReceiverPwm(null)
-        emergencyLatched = false
-        neutralizeGamepad(
-          incompatible ? 'incompatible' : 'disconnected',
-          incompatible?.id || lastGamepadId,
-        )
-        animationFrame = window.requestAnimationFrame(pollGamepad)
+      const snapshot = readSnapshot()
+      if (snapshot.status !== 'connected') {
+        handleUnavailableSnapshot(snapshot)
+        if (snapshot.status !== 'unsupported') scheduleDiscovery()
         return
       }
 
+      const gamepad = snapshot.gamepad
+      confirmedDisconnected = false
+      lastGamepadId = gamepad.id || lastGamepadId
       updateReceiverPwm(gamepad)
-
-      if (suspended) {
-        emergencyLatched = false
-        neutralizeGamepad('connected', gamepad.id)
-        animationFrame = window.requestAnimationFrame(pollGamepad)
-        return
-      }
 
       const input = getDriveGamepadInput(gamepad)
       const wasEmergencyLatched = emergencyLatched
@@ -614,12 +658,12 @@ function App() {
       if (emergencyLatched) {
         if (!wasEmergencyLatched) engageEmergencyStop(gamepad.id)
         else updateStatus('emergency', gamepad.id)
-        animationFrame = window.requestAnimationFrame(pollGamepad)
+        scheduleControlFrame(pollGamepad)
         return
       }
       if (wasEmergencyLatched) {
         neutralizeGamepad('connected', gamepad.id)
-        animationFrame = window.requestAnimationFrame(pollGamepad)
+        scheduleControlFrame(pollGamepad)
         return
       }
 
@@ -632,11 +676,9 @@ function App() {
         steeringReversed: steeringReversedRef.current,
         motorReversed: motorReversedRef.current,
       })
-      lastGamepadId = gamepad.id
-
       if (!output.active) {
         neutralizeGamepad('connected', gamepad.id)
-        animationFrame = window.requestAnimationFrame(pollGamepad)
+        scheduleControlFrame(pollGamepad)
         return
       }
 
@@ -661,45 +703,88 @@ function App() {
         lastEmitAt = timestamp
       }
 
-      animationFrame = window.requestAnimationFrame(pollGamepad)
+      scheduleControlFrame(pollGamepad)
     }
 
-    const suspendGamepad = () => {
-      suspended = true
-      const gamepad = readGamepads().find(isDriveGamepad)
+    function scanGamepad() {
+      if (destroyed || !monitoring || document.hidden) return
+
+      const snapshot = readSnapshot()
+      if (snapshot.status !== 'connected') {
+        handleUnavailableSnapshot(snapshot)
+        if (snapshot.status !== 'unsupported') scheduleDiscovery()
+        return
+      }
+
+      confirmedDisconnected = false
+      lastGamepadId = snapshot.id || lastGamepadId
+      updateReceiverPwm(snapshot.gamepad)
+      neutralizeGamepad('connected', snapshot.id)
+      scheduleControlFrame(pollGamepad)
+    }
+
+    const startMonitoring = () => {
+      if (destroyed || document.hidden) return
+      monitoring = true
+      cancelScheduledMonitoring()
+      scheduleDiscovery(0)
+    }
+
+    const stopMonitoring = () => {
+      monitoring = false
+      cancelScheduledMonitoring()
       emergencyLatched = false
       neutralizeGamepad(
-        gamepad ? 'connected' : 'disconnected',
-        gamepad?.id || lastGamepadId,
+        confirmedDisconnected ? 'disconnected' : 'waiting',
+        lastGamepadId,
       )
     }
-    const resumeGamepad = () => {
-      suspended = document.hidden
-    }
+
     const onVisibilityChange = () => {
-      if (document.hidden) suspendGamepad()
-      else resumeGamepad()
+      if (document.hidden) stopMonitoring()
+      else startMonitoring()
+    }
+    const onGamepadConnected = event => {
+      if (isDriveGamepadIdentity(event.gamepad)) {
+        confirmedDisconnected = false
+        lastGamepadId = event.gamepad.id || lastGamepadId
+        updateReceiverPwm(event.gamepad)
+        updateStatus('connected', event.gamepad.id)
+      } else if (event.gamepad?.connected) {
+        updateStatus('incompatible', event.gamepad.id)
+      }
+      startMonitoring()
     }
     const onGamepadDisconnected = event => {
       if (isDriveGamepadIdentity(event.gamepad)) {
+        confirmedDisconnected = true
         emergencyLatched = false
         neutralizeGamepad('disconnected', event.gamepad.id)
       }
+      startMonitoring()
     }
 
-    window.addEventListener('blur', suspendGamepad)
-    window.addEventListener('focus', resumeGamepad)
+    window.addEventListener('blur', stopMonitoring)
+    window.addEventListener('focus', startMonitoring)
+    window.addEventListener('pageshow', startMonitoring)
+    window.addEventListener('pagehide', stopMonitoring)
+    window.addEventListener('gamepadconnected', onGamepadConnected)
     window.addEventListener('gamepaddisconnected', onGamepadDisconnected)
     document.addEventListener('visibilitychange', onVisibilityChange)
-    animationFrame = window.requestAnimationFrame(pollGamepad)
+    startMonitoring()
 
     return () => {
-      window.cancelAnimationFrame(animationFrame)
-      window.removeEventListener('blur', suspendGamepad)
-      window.removeEventListener('focus', resumeGamepad)
+      destroyed = true
+      monitoring = false
+      cancelScheduledMonitoring()
+      window.removeEventListener('blur', stopMonitoring)
+      window.removeEventListener('focus', startMonitoring)
+      window.removeEventListener('pageshow', startMonitoring)
+      window.removeEventListener('pagehide', stopMonitoring)
+      window.removeEventListener('gamepadconnected', onGamepadConnected)
       window.removeEventListener('gamepaddisconnected', onGamepadDisconnected)
       document.removeEventListener('visibilitychange', onVisibilityChange)
-      neutralizeGamepad('disconnected', lastGamepadId)
+      neutralizeGamepad('waiting', lastGamepadId)
     }
   }, [])
 
@@ -780,7 +865,7 @@ function App() {
           </span>
           <span
             className={`GamepadStatus GamepadStatus--${gamepadState.status}`}
-            title={gamepadState.id || gamepadText}
+            title={gamepadTitle}
           >
             <i aria-hidden="true" />
             {gamepadText}

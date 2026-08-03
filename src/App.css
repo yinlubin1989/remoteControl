@@ -126,6 +126,10 @@ body,
 .GamepadStatus--connected {
     color: #acf9fb;
 }
+.GamepadStatus--waiting,
+.GamepadStatus--blocked {
+    color: #ffb37a;
+}
 .GamepadStatus--active {
     color: #8fffb2;
     text-shadow: 0 0 10px rgba(143, 255, 178, 0.42);

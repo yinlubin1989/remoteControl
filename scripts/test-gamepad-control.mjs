@@ -8,6 +8,7 @@ import {
   isDriveGamepad,
   isDriveGamepadIdentity,
   normalizeGamepadAxis,
+  readGamepadSnapshot,
 } from '../src/gamepadControl.js'
 
 const toBrowserAxis = rawAxis => (
@@ -40,6 +41,58 @@ assert.equal(isDriveGamepadIdentity({
   mapping: 'standard',
   axes: [0, 0, 0, 0],
 }), true)
+
+assert.deepEqual(readGamepadSnapshot(), {
+  status: 'unsupported',
+  gamepad: null,
+  id: '',
+})
+assert.deepEqual(readGamepadSnapshot(() => []), {
+  status: 'waiting',
+  gamepad: null,
+  id: '',
+})
+assert.deepEqual(readGamepadSnapshot(() => [{
+  connected: false,
+  id: 'RC Car Controller',
+  mapping: '',
+  axes: [0, 0, 0, 0],
+}]), {
+  status: 'waiting',
+  gamepad: null,
+  id: '',
+})
+
+const connectedDriveGamepad = {
+  connected: true,
+  id: 'RC Car Controller',
+  mapping: '',
+  axes: [0, 0, 0, 0],
+}
+assert.deepEqual(readGamepadSnapshot(() => [null, connectedDriveGamepad]), {
+  status: 'connected',
+  gamepad: connectedDriveGamepad,
+  id: connectedDriveGamepad.id,
+})
+assert.deepEqual(readGamepadSnapshot(() => [{
+  connected: true,
+  id: 'Unsupported Controller',
+  mapping: '',
+  axes: [0, 0],
+}]), {
+  status: 'incompatible',
+  gamepad: null,
+  id: 'Unsupported Controller',
+})
+
+const gamepadReadError = new Error('gamepad access blocked')
+const blockedSnapshot = readGamepadSnapshot(() => {
+  throw gamepadReadError
+})
+assert.equal(blockedSnapshot.status, 'blocked')
+assert.equal(blockedSnapshot.gamepad, null)
+assert.equal(blockedSnapshot.id, '')
+assert.equal(blockedSnapshot.error, gamepadReadError)
 
 const remoteInput = getDriveGamepadInput({
   axes: [0.25, -0.5, 0.75, -0.25],
