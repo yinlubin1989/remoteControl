@@ -139,14 +139,11 @@ export const getGamepadEmergencyLatched = ({
 export const getGamepadDriveOutput = ({
   leftY,
   rightX,
-  throttleLimitPercent = 100,
-  isLimit = false,
   steeringCenter = 1500,
   steeringReversed = false,
   motorReversed = false,
 }) => {
   const throttleAxis = normalizeGamepadAxis(leftY)
-  const throttleLimit = clamp(throttleLimitPercent, 0, 100) / 100
   const steeringAxis = normalizeGamepadAxis(rightX)
   const steeringSign = steeringReversed ? 1 : -1
   const steeringPulse = clamp(
@@ -155,10 +152,7 @@ export const getGamepadDriveOutput = ({
     2500,
   )
 
-  const throttleScale = isLimit
-    ? throttleAxis < 0 ? 250 : 200
-    : 500
-  const rawThrottlePulse = 1500 + throttleAxis * throttleLimit * throttleScale
+  const rawThrottlePulse = 1500 + throttleAxis * 500
   const throttlePulse = Math.round(
     motorReversed
       ? 1500 - (rawThrottlePulse - 1500)

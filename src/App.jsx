@@ -143,7 +143,6 @@ function App() {
   const gearValue = useRef('D')
   const videoPlayer = useRef()
   const [pannel, setPannel] = useState('')
-  const [isLimit, setIsLimit] = useState(false)
   const [steeringReversed, setSteeringReversed] = useState(() => (
     loadDirectionSetting(STEERING_DIRECTION_KEY)
   ))
@@ -155,7 +154,6 @@ function App() {
   const steeringReversedRef = useRef(steeringReversed)
   const steeringCenterRef = useRef(steeringCenter)
   const motorReversedRef = useRef(motorReversed)
-  const isLimitRef = useRef(isLimit)
   const gamepadActiveRef = useRef(false)
   const [gamepadState, setGamepadState] = useState(() => ({
     status: typeof navigator.getGamepads === 'function'
@@ -226,10 +224,6 @@ function App() {
   const gamepadTitle = gamepadState.status === 'waiting'
     ? '如未识别，请先将方向和油门回中，再拨动方向或油门'
     : gamepadState.id || gamepadText
-
-  useEffect(() => {
-    isLimitRef.current = isLimit
-  }, [isLimit])
 
   useEffect(() => {
     steeringReversedRef.current = steeringReversed
@@ -515,10 +509,6 @@ function App() {
     setVideoDecoder(decoder)
   }
 
-  const limitChange = (e) => {
-    setIsLimit(e)
-  }
-
   useEffect(() => {
     let animationFrame
     let discoveryTimer
@@ -670,8 +660,6 @@ function App() {
       const output = getGamepadDriveOutput({
         leftY: input.leftY,
         rightX: input.rightX,
-        throttleLimitPercent: refSpeed.current,
-        isLimit: isLimitRef.current,
         steeringCenter: steeringCenterRef.current,
         steeringReversed: steeringReversedRef.current,
         motorReversed: motorReversedRef.current,
@@ -924,7 +912,6 @@ function App() {
       />
       <Keybords
         socket={socket}
-        limitChange={limitChange}
         fullScreen={fullScreen}
         isFullScreen={isFullScreen}
         openVideoSettings={openVideoSettings}
