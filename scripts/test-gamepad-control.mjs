@@ -109,7 +109,7 @@ assert.deepEqual(remoteInput, {
 
 const receiverDriveInput = getDriveGamepadInput({
   id: 'RC Car Controller',
-  axes: [toBrowserAxis(6000), 0, 0, toBrowserAxis(26000)],
+  axes: [toBrowserAxis(8500), 0, 0, toBrowserAxis(23500)],
   buttons: [],
 })
 assert.deepEqual(receiverDriveInput, {
@@ -128,7 +128,7 @@ assert.deepEqual(getDriveGamepadInput({
 })
 assert.deepEqual(getDriveGamepadInput({
   id: 'RC Car Controller',
-  axes: [toBrowserAxis(6000), 0.8, -0.8, -1],
+  axes: [toBrowserAxis(8500), 0.8, -0.8, -1],
   buttons: [],
 }), {
   leftY: 0,
@@ -138,12 +138,12 @@ assert.deepEqual(getDriveGamepadInput({
 
 assert.equal(decodeReceiverPwmAxis(-1), null)
 assert.equal(decodeReceiverPwmAxis(0), null)
-assert.equal(decodeReceiverPwmAxis(toBrowserAxis(1000)), 750)
+assert.equal(decodeReceiverPwmAxis(toBrowserAxis(1000)), 500)
 assert.equal(decodeReceiverPwmAxis(toBrowserAxis(16000)), 1500)
-assert.equal(decodeReceiverPwmAxis(toBrowserAxis(31000)), 2250)
+assert.equal(decodeReceiverPwmAxis(toBrowserAxis(31000)), 2500)
 assert.deepEqual(getReceiverPwmTelemetry({
   id: 'RC Car Controller (Vendor: 045e Product: 02fd)',
-  axes: [toBrowserAxis(6000), 0, 0, toBrowserAxis(21000)],
+  axes: [toBrowserAxis(8500), 0, 0, toBrowserAxis(19750)],
 }), {
   supported: true,
   valid: true,

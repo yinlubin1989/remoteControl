@@ -5,14 +5,14 @@
 namespace remote_input {
 
 constexpr int16_t AXIS_MAX = 32767;
-constexpr uint16_t MIN_VALID_PULSE_US = 750;
-constexpr uint16_t MAX_VALID_PULSE_US = 2250;
+constexpr uint16_t MIN_VALID_PULSE_US = 500;
+constexpr uint16_t MAX_VALID_PULSE_US = 2500;
 constexpr uint16_t DEFAULT_DEAD_ZONE_US = 20;
 constexpr uint16_t MIN_CALIBRATION_TRAVEL_US = 150;
 constexpr uint32_t SIGNAL_TIMEOUT_US = 100000;
 constexpr uint32_t CENTER_UNLOCK_MS = 500;
 constexpr uint32_t REPORT_INTERVAL_MS = 10;
-constexpr int16_t PWM_TELEMETRY_AXIS_SCALE = 20;
+constexpr int16_t PWM_TELEMETRY_AXIS_SCALE = 15;
 constexpr int16_t PWM_TELEMETRY_AXIS_OFFSET = 1000;
 constexpr int16_t PWM_TELEMETRY_INVALID_AXIS = -32768;
 
