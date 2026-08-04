@@ -135,6 +135,42 @@ assert.deepEqual(getDriveGamepadInput({
   rightX: 0,
   emergencyPressed: false,
 })
+const calibratedReceiverInput = getDriveGamepadInput({
+  id: 'RC Car Controller',
+  axes: [toBrowserAxis(13990), 0.8, -0.8, toBrowserAxis(17635)],
+  buttons: [],
+}, {
+  receiverSteeringCenter: 1366,
+  receiverThrottleCenter: 1609,
+})
+assert.deepEqual(calibratedReceiverInput, {
+  leftY: 0,
+  rightX: 0,
+  emergencyPressed: false,
+})
+const calibratedReceiverOutput = getGamepadDriveOutput({
+  ...calibratedReceiverInput,
+  steeringCenter: 1620,
+})
+assert.deepEqual(
+  [
+    calibratedReceiverOutput.steeringPulse,
+    calibratedReceiverOutput.throttlePulse,
+  ],
+  [1620, 1500],
+)
+assert.deepEqual(getDriveGamepadInput({
+  id: 'RC Car Controller',
+  axes: [toBrowserAxis(21490), 0, 0, toBrowserAxis(10135)],
+  buttons: [],
+}, {
+  receiverSteeringCenter: 1366,
+  receiverThrottleCenter: 1609,
+}), {
+  leftY: -1,
+  rightX: 1,
+  emergencyPressed: false,
+})
 
 assert.equal(decodeReceiverPwmAxis(-1), null)
 assert.equal(decodeReceiverPwmAxis(0), null)

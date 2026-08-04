@@ -68,6 +68,11 @@ const BRAKE_PWM_OFFSET = 300
 const STEERING_DIRECTION_KEY = 'steering-direction'
 const STEERING_CENTER_KEY = 'steering-center-pulse'
 const MOTOR_DIRECTION_KEY = 'motor-direction'
+const RECEIVER_STEERING_CENTER_KEY = 'receiver-steering-center-pulse'
+const RECEIVER_THROTTLE_CENTER_KEY = 'receiver-throttle-center-pulse'
+const RECEIVER_INPUT_CENTER_DEFAULT = 1500
+const RECEIVER_INPUT_CENTER_MIN = 500
+const RECEIVER_INPUT_CENTER_MAX = 2500
 const DECODER_STORAGE_KEY = 'video-decoder'
 const VALID_DECODERS = ['webcodecs', 'broadway']
 const GAMEPAD_DISCOVERY_INTERVAL_MS = 250
@@ -90,6 +95,17 @@ const loadSteeringCenter = () => {
   return Math.min(
     STEERING_CENTER_MAX,
     Math.max(STEERING_CENTER_MIN, savedValue),
+  )
+}
+
+const loadReceiverInputCenter = key => {
+  const saved = window.localStorage.getItem(key)
+  if (saved === null || saved === '') return RECEIVER_INPUT_CENTER_DEFAULT
+  const savedValue = Number(saved)
+  if (!Number.isFinite(savedValue)) return RECEIVER_INPUT_CENTER_DEFAULT
+  return Math.min(
+    RECEIVER_INPUT_CENTER_MAX,
+    Math.max(RECEIVER_INPUT_CENTER_MIN, Math.round(savedValue)),
   )
 }
 
@@ -147,12 +163,17 @@ function App() {
     loadDirectionSetting(STEERING_DIRECTION_KEY)
   ))
   const [steeringCenter, setSteeringCenter] = useState(loadSteeringCenter)
+  const [receiverInputCenters, setReceiverInputCenters] = useState(() => ({
+    steering: loadReceiverInputCenter(RECEIVER_STEERING_CENTER_KEY),
+    throttle: loadReceiverInputCenter(RECEIVER_THROTTLE_CENTER_KEY),
+  }))
   const [motorReversed, setMotorReversed] = useState(() => (
     loadDirectionSetting(MOTOR_DIRECTION_KEY)
   ))
   const [isFullScreen, setIsFullScreen] = useState(false)
   const steeringReversedRef = useRef(steeringReversed)
   const steeringCenterRef = useRef(steeringCenter)
+  const receiverInputCentersRef = useRef(receiverInputCenters)
   const motorReversedRef = useRef(motorReversed)
   const gamepadActiveRef = useRef(false)
   const [gamepadState, setGamepadState] = useState(() => ({
@@ -509,6 +530,26 @@ function App() {
     setVideoDecoder(decoder)
   }
 
+  const setReceiverInputCenter = (channel, pulse) => {
+    if (!Number.isFinite(pulse)) return
+    const center = Math.min(
+      RECEIVER_INPUT_CENTER_MAX,
+      Math.max(RECEIVER_INPUT_CENTER_MIN, Math.round(pulse)),
+    )
+    const next = {
+      ...receiverInputCentersRef.current,
+      [channel]: center,
+    }
+    receiverInputCentersRef.current = next
+    setReceiverInputCenters(next)
+    window.localStorage.setItem(
+      channel === 'steering'
+        ? RECEIVER_STEERING_CENTER_KEY
+        : RECEIVER_THROTTLE_CENTER_KEY,
+      center,
+    )
+  }
+
   useEffect(() => {
     let animationFrame
     let discoveryTimer
@@ -637,7 +678,15 @@ function App() {
       lastGamepadId = gamepad.id || lastGamepadId
       updateReceiverPwm(gamepad)
 
-      const input = getDriveGamepadInput(gamepad)
+      const input = getDriveGamepadInput(
+        gamepad,
+        {
+          receiverSteeringCenter:
+            receiverInputCentersRef.current.steering,
+          receiverThrottleCenter:
+            receiverInputCentersRef.current.throttle,
+        },
+      )
       const wasEmergencyLatched = emergencyLatched
       emergencyLatched = getGamepadEmergencyLatched({
         latched: emergencyLatched,
@@ -864,12 +913,36 @@ function App() {
                 'ReceiverPwmStatus',
                 receiverPwmState.valid ? 'valid' : 'invalid',
               ].join(' ')}
-              title="接收机原始PWM脉宽"
+              title="点击方向或油门当前值，将其设为遥控器输入中位"
             >
               PWM · 方向&nbsp;
-              {receiverPwmState.steeringPulse ?? '--'} μs
+              <button
+                className="ReceiverPwmValue"
+                type="button"
+                disabled={receiverPwmState.steeringPulse === null}
+                onClick={() => setReceiverInputCenter(
+                  'steering',
+                  receiverPwmState.steeringPulse,
+                )}
+                title="将当前方向PWM设为遥控器输入中位"
+              >
+                {receiverPwmState.steeringPulse ?? '--'} μs
+              </button>
+              <small>中{receiverInputCenters.steering}</small>
               &nbsp;· 油门&nbsp;
-              {receiverPwmState.throttlePulse ?? '--'} μs
+              <button
+                className="ReceiverPwmValue"
+                type="button"
+                disabled={receiverPwmState.throttlePulse === null}
+                onClick={() => setReceiverInputCenter(
+                  'throttle',
+                  receiverPwmState.throttlePulse,
+                )}
+                title="将当前油门PWM设为遥控器输入中位，车辆输出仍为1500μs"
+              >
+                {receiverPwmState.throttlePulse ?? '--'} μs
+              </button>
+              <small>中{receiverInputCenters.throttle}</small>
             </span>
           )}
         </div>
