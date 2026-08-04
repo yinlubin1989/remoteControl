@@ -5,6 +5,8 @@ export const PWM_TELEMETRY_AXIS_SCALE = 20
 const PWM_TELEMETRY_AXIS_OFFSET = 1000
 const PWM_TELEMETRY_MIN_US = 750
 const PWM_TELEMETRY_MAX_US = 2250
+const RECEIVER_PWM_CENTER_US = 1500
+const RECEIVER_PWM_HALF_RANGE_US = 500
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
@@ -77,12 +79,6 @@ const isButtonPressed = button => Boolean(
   button?.pressed || button?.value > 0.5
 )
 
-export const getDriveGamepadInput = gamepad => ({
-  leftY: gamepad?.axes?.[1] || 0,
-  rightX: gamepad?.axes?.[2] || 0,
-  emergencyPressed: isButtonPressed(gamepad?.buttons?.[11]),
-})
-
 export const decodeReceiverPwmAxis = axisValue => {
   if (!Number.isFinite(axisValue)) return null
   const axis = clamp(axisValue, -1, 1)
@@ -121,6 +117,42 @@ export const getReceiverPwmTelemetry = gamepad => {
     valid: steeringPulse !== null && throttlePulse !== null,
     steeringPulse,
     throttlePulse,
+  }
+}
+
+const receiverPwmToGamepadAxis = pulseUs => (
+  Number.isFinite(pulseUs)
+    ? clamp(
+      (pulseUs - RECEIVER_PWM_CENTER_US) / RECEIVER_PWM_HALF_RANGE_US,
+      -1,
+      1,
+    )
+    : 0
+)
+
+export const getDriveGamepadInput = gamepad => {
+  const emergencyPressed = isButtonPressed(gamepad?.buttons?.[11])
+  const receiverPwm = getReceiverPwmTelemetry(gamepad)
+  if (receiverPwm.supported) {
+    if (!receiverPwm.valid) {
+      return {
+        leftY: 0,
+        rightX: 0,
+        emergencyPressed,
+      }
+    }
+
+    return {
+      leftY: receiverPwmToGamepadAxis(receiverPwm.throttlePulse),
+      rightX: receiverPwmToGamepadAxis(receiverPwm.steeringPulse),
+      emergencyPressed,
+    }
+  }
+
+  return {
+    leftY: gamepad?.axes?.[1] || 0,
+    rightX: gamepad?.axes?.[2] || 0,
+    emergencyPressed,
   }
 }
 

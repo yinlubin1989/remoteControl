@@ -107,6 +107,35 @@ assert.deepEqual(remoteInput, {
   emergencyPressed: true,
 })
 
+const receiverDriveInput = getDriveGamepadInput({
+  id: 'RC Car Controller',
+  axes: [toBrowserAxis(6000), 0, 0, toBrowserAxis(26000)],
+  buttons: [],
+})
+assert.deepEqual(receiverDriveInput, {
+  leftY: 1,
+  rightX: -1,
+  emergencyPressed: false,
+})
+assert.deepEqual(getDriveGamepadInput({
+  id: 'RC Car Controller',
+  axes: [toBrowserAxis(16000), 0.8, -0.8, toBrowserAxis(16000)],
+  buttons: [],
+}), {
+  leftY: 0,
+  rightX: 0,
+  emergencyPressed: false,
+})
+assert.deepEqual(getDriveGamepadInput({
+  id: 'RC Car Controller',
+  axes: [toBrowserAxis(6000), 0.8, -0.8, -1],
+  buttons: [],
+}), {
+  leftY: 0,
+  rightX: 0,
+  emergencyPressed: false,
+})
+
 assert.equal(decodeReceiverPwmAxis(-1), null)
 assert.equal(decodeReceiverPwmAxis(0), null)
 assert.equal(decodeReceiverPwmAxis(toBrowserAxis(1000)), 750)
