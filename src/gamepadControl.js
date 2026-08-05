@@ -1,12 +1,18 @@
 export const GAMEPAD_AXIS_DEAD_ZONE = 0.08
 export const REMOTE_CONTROL_GAMEPAD_NAME = 'RC Car Controller'
 export const PWM_TELEMETRY_AXIS_SCALE = 15
+export const RECEIVER_CALIBRATION_VERSION = 1
+export const RECEIVER_CALIBRATION_MIN_TRAVEL_US = 150
 
 const PWM_TELEMETRY_AXIS_OFFSET = 1000
 const PWM_TELEMETRY_MIN_US = 500
 const PWM_TELEMETRY_MAX_US = 2500
-const RECEIVER_PWM_CENTER_US = 1500
-const RECEIVER_PWM_HALF_RANGE_US = 500
+
+export const DEFAULT_RECEIVER_CALIBRATION = Object.freeze({
+  negativePulse: 1000,
+  centerPulse: 1500,
+  positivePulse: 2000,
+})
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
@@ -120,21 +126,130 @@ export const getReceiverPwmTelemetry = gamepad => {
   }
 }
 
-const receiverPwmToGamepadAxis = (pulseUs, centerPulseUs) => {
-  if (!Number.isFinite(pulseUs)) return 0
-  const center = Number.isFinite(centerPulseUs)
-    ? centerPulseUs
-    : RECEIVER_PWM_CENTER_US
-  return clamp(
-    (pulseUs - center) / RECEIVER_PWM_HALF_RANGE_US,
-    -1,
-    1,
+export const getReceiverCalibrationError = calibration => {
+  const pulses = [
+    calibration?.negativePulse,
+    calibration?.centerPulse,
+    calibration?.positivePulse,
+  ]
+  if (!pulses.every(Number.isFinite)) {
+    return '请完成三个位置的采样'
+  }
+  if (pulses.some(
+    pulse => pulse < PWM_TELEMETRY_MIN_US
+      || pulse > PWM_TELEMETRY_MAX_US,
+  )) {
+    return `PWM 必须位于 ${PWM_TELEMETRY_MIN_US}–${PWM_TELEMETRY_MAX_US} μs`
+  }
+
+  const negativeDistance = Math.abs(
+    calibration.negativePulse - calibration.centerPulse,
   )
+  const positiveDistance = Math.abs(
+    calibration.positivePulse - calibration.centerPulse,
+  )
+  if (
+    negativeDistance < RECEIVER_CALIBRATION_MIN_TRAVEL_US
+    || positiveDistance < RECEIVER_CALIBRATION_MIN_TRAVEL_US
+  ) {
+    return `中位到两端各需至少 ${RECEIVER_CALIBRATION_MIN_TRAVEL_US} μs 行程`
+  }
+
+  const negativeOffset = calibration.negativePulse - calibration.centerPulse
+  const positiveOffset = calibration.positivePulse - calibration.centerPulse
+  if (Math.sign(negativeOffset) === Math.sign(positiveOffset)) {
+    return '两个行程端点必须分别位于中位两侧'
+  }
+
+  return ''
+}
+
+export const isReceiverCalibrationValid = calibration => (
+  getReceiverCalibrationError(calibration) === ''
+)
+
+export const createReceiverCalibrationFromCenter = centerValue => {
+  if (centerValue === null || centerValue === '') {
+    return { ...DEFAULT_RECEIVER_CALIBRATION }
+  }
+  const centerPulse = Math.round(Number(centerValue))
+  if (!Number.isFinite(centerPulse)) {
+    return { ...DEFAULT_RECEIVER_CALIBRATION }
+  }
+
+  const calibration = {
+    negativePulse: centerPulse - 500,
+    centerPulse,
+    positivePulse: centerPulse + 500,
+  }
+  return isReceiverCalibrationValid(calibration)
+    ? calibration
+    : { ...DEFAULT_RECEIVER_CALIBRATION }
+}
+
+export const parseReceiverCalibrationSettings = (
+  serializedSettings,
+  legacyCenters = {},
+) => {
+  if (serializedSettings) {
+    try {
+      const parsed = JSON.parse(serializedSettings)
+      if (
+        parsed?.version === RECEIVER_CALIBRATION_VERSION
+        && isReceiverCalibrationValid(parsed.steering)
+        && isReceiverCalibrationValid(parsed.throttle)
+      ) {
+        return {
+          steering: { ...parsed.steering },
+          throttle: { ...parsed.throttle },
+        }
+      }
+    } catch (error) {
+      // Invalid browser data falls through to the documented legacy migration.
+    }
+  }
+
+  return {
+    steering: createReceiverCalibrationFromCenter(
+      legacyCenters.steering,
+    ),
+    throttle: createReceiverCalibrationFromCenter(
+      legacyCenters.throttle,
+    ),
+  }
+}
+
+export const mapReceiverPwmToGamepadAxis = (pulseUs, calibration) => {
+  if (
+    !Number.isFinite(pulseUs)
+    || !isReceiverCalibrationValid(calibration)
+  ) {
+    return 0
+  }
+
+  const offset = pulseUs - calibration.centerPulse
+  if (offset === 0) return 0
+
+  const negativeOffset = (
+    calibration.negativePulse - calibration.centerPulse
+  )
+  if (Math.sign(offset) === Math.sign(negativeOffset)) {
+    return -clamp(offset / negativeOffset, 0, 1)
+  }
+
+  const positiveOffset = (
+    calibration.positivePulse - calibration.centerPulse
+  )
+  if (Math.sign(offset) === Math.sign(positiveOffset)) {
+    return clamp(offset / positiveOffset, 0, 1)
+  }
+
+  return 0
 }
 
 export const getDriveGamepadInput = (gamepad, {
-  receiverSteeringCenter = RECEIVER_PWM_CENTER_US,
-  receiverThrottleCenter = RECEIVER_PWM_CENTER_US,
+  receiverSteeringCalibration = DEFAULT_RECEIVER_CALIBRATION,
+  receiverThrottleCalibration = DEFAULT_RECEIVER_CALIBRATION,
 } = {}) => {
   const emergencyPressed = isButtonPressed(gamepad?.buttons?.[11])
   const receiverPwm = getReceiverPwmTelemetry(gamepad)
@@ -148,13 +263,13 @@ export const getDriveGamepadInput = (gamepad, {
     }
 
     return {
-      leftY: receiverPwmToGamepadAxis(
+      leftY: mapReceiverPwmToGamepadAxis(
         receiverPwm.throttlePulse,
-        receiverThrottleCenter,
+        receiverThrottleCalibration,
       ),
-      rightX: receiverPwmToGamepadAxis(
+      rightX: mapReceiverPwmToGamepadAxis(
         receiverPwm.steeringPulse,
-        receiverSteeringCenter,
+        receiverSteeringCalibration,
       ),
       emergencyPressed,
     }

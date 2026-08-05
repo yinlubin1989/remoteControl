@@ -8,12 +8,17 @@ import {
   getGamepadEmergencyLatched,
   getGamepadDriveOutput,
   getReceiverPwmTelemetry,
+  isReceiverCalibrationValid,
   isDriveGamepadIdentity,
+  normalizeGamepadAxis,
+  parseReceiverCalibrationSettings,
   readGamepadSnapshot,
+  RECEIVER_CALIBRATION_VERSION,
 } from './gamepadControl'
 import Keybords from './components/Keybords'
 import Gear from './components/Gear'
 import Direction from './components/Direction'
+import ReceiverCalibrationModal from './components/ReceiverCalibrationModal'
 import VideoSettingsModal from './components/VideoSettingsModal'
 
 import './App.css'
@@ -70,12 +75,11 @@ const STEERING_CENTER_KEY = 'steering-center-pulse'
 const MOTOR_DIRECTION_KEY = 'motor-direction'
 const RECEIVER_STEERING_CENTER_KEY = 'receiver-steering-center-pulse'
 const RECEIVER_THROTTLE_CENTER_KEY = 'receiver-throttle-center-pulse'
-const RECEIVER_INPUT_CENTER_DEFAULT = 1500
-const RECEIVER_INPUT_CENTER_MIN = 500
-const RECEIVER_INPUT_CENTER_MAX = 2500
+const RECEIVER_CALIBRATION_STORAGE_KEY = 'receiver-input-calibration-v1'
 const DECODER_STORAGE_KEY = 'video-decoder'
 const VALID_DECODERS = ['webcodecs', 'broadway']
 const GAMEPAD_DISCOVERY_INTERVAL_MS = 250
+const GAMEPAD_REARM_CENTER_MS = 500
 const EMPTY_RECEIVER_PWM_STATE = {
   supported: false,
   valid: false,
@@ -98,16 +102,19 @@ const loadSteeringCenter = () => {
   )
 }
 
-const loadReceiverInputCenter = key => {
-  const saved = window.localStorage.getItem(key)
-  if (saved === null || saved === '') return RECEIVER_INPUT_CENTER_DEFAULT
-  const savedValue = Number(saved)
-  if (!Number.isFinite(savedValue)) return RECEIVER_INPUT_CENTER_DEFAULT
-  return Math.min(
-    RECEIVER_INPUT_CENTER_MAX,
-    Math.max(RECEIVER_INPUT_CENTER_MIN, Math.round(savedValue)),
+const loadReceiverInputCalibrations = () => (
+  parseReceiverCalibrationSettings(
+    window.localStorage.getItem(RECEIVER_CALIBRATION_STORAGE_KEY),
+    {
+      steering: window.localStorage.getItem(
+        RECEIVER_STEERING_CENTER_KEY,
+      ),
+      throttle: window.localStorage.getItem(
+        RECEIVER_THROTTLE_CENTER_KEY,
+      ),
+    },
   )
-}
+)
 
 const loadVideoDecoder = () => {
   const queryDecoder = new URLSearchParams(window.location.search).get('decoder')
@@ -163,17 +170,21 @@ function App() {
     loadDirectionSetting(STEERING_DIRECTION_KEY)
   ))
   const [steeringCenter, setSteeringCenter] = useState(loadSteeringCenter)
-  const [receiverInputCenters, setReceiverInputCenters] = useState(() => ({
-    steering: loadReceiverInputCenter(RECEIVER_STEERING_CENTER_KEY),
-    throttle: loadReceiverInputCenter(RECEIVER_THROTTLE_CENTER_KEY),
-  }))
+  const [receiverInputCalibrations, setReceiverInputCalibrations] = useState(
+    loadReceiverInputCalibrations,
+  )
+  const [receiverCalibrationChannel, setReceiverCalibrationChannel] = useState(
+    null,
+  )
   const [motorReversed, setMotorReversed] = useState(() => (
     loadDirectionSetting(MOTOR_DIRECTION_KEY)
   ))
   const [isFullScreen, setIsFullScreen] = useState(false)
   const steeringReversedRef = useRef(steeringReversed)
   const steeringCenterRef = useRef(steeringCenter)
-  const receiverInputCentersRef = useRef(receiverInputCenters)
+  const receiverInputCalibrationsRef = useRef(receiverInputCalibrations)
+  const receiverCalibrationOpenRef = useRef(false)
+  const receiverCalibrationRearmRef = useRef(false)
   const motorReversedRef = useRef(motorReversed)
   const gamepadActiveRef = useRef(false)
   const [gamepadState, setGamepadState] = useState(() => ({
@@ -229,22 +240,28 @@ function App() {
     ? `手柄接管中 · ${gamepadName}`
     : gamepadState.status === 'emergency'
       ? `遥控器急停 · 回中解锁 · ${gamepadName}`
-      : gamepadState.status === 'connected'
-        ? `手柄已连接 · ${gamepadName}`
-        : gamepadState.status === 'waiting'
-          ? '等待手柄输入 · 请拨动遥控器'
-          : gamepadState.status === 'incompatible'
-            ? `手柄不兼容 · ${gamepadName}`
-            : gamepadState.status === 'unsupported'
-              ? '浏览器不支持手柄'
-              : gamepadState.status === 'blocked'
-                ? '手柄访问受限'
-                : gamepadName
-                  ? `手柄已断开 · ${gamepadName}`
-                  : '手柄已断开'
+      : gamepadState.status === 'calibrating'
+        ? `遥控器校准中 · 车辆已回中`
+        : gamepadState.status === 'rearming'
+          ? '请将方向和油门回中'
+          : gamepadState.status === 'connected'
+            ? `手柄已连接 · ${gamepadName}`
+            : gamepadState.status === 'waiting'
+              ? '等待手柄输入 · 请拨动遥控器'
+              : gamepadState.status === 'incompatible'
+                ? `手柄不兼容 · ${gamepadName}`
+                : gamepadState.status === 'unsupported'
+                  ? '浏览器不支持手柄'
+                  : gamepadState.status === 'blocked'
+                    ? '手柄访问受限'
+                    : gamepadName
+                      ? `手柄已断开 · ${gamepadName}`
+                      : '手柄已断开'
   const gamepadTitle = gamepadState.status === 'waiting'
     ? '如未识别，请先将方向和油门回中，再拨动方向或油门'
-    : gamepadState.id || gamepadText
+    : ['calibrating', 'rearming'].includes(gamepadState.status)
+      ? gamepadText
+      : gamepadState.id || gamepadText
 
   useEffect(() => {
     steeringReversedRef.current = steeringReversed
@@ -354,7 +371,10 @@ function App() {
 
   const initKeyBoard = () => {
     const onKeyDown = (e) => {
-      if (gamepadActiveRef.current) return
+      if (
+        gamepadActiveRef.current
+        || receiverCalibrationOpenRef.current
+      ) return
       if (e.key === ' ') {
         onTouchThrottle()
       }
@@ -424,7 +444,10 @@ function App() {
   }
 
   const onTouchThrottle = () => {
-    if (gamepadActiveRef.current) return
+    if (
+      gamepadActiveRef.current
+      || receiverCalibrationOpenRef.current
+    ) return
     let pwm = THROTTLE_NEUTRAL
     if (gearValue.current === 'D') {
       pwm = pwm - (refSpeed.current * 5)
@@ -449,7 +472,10 @@ function App() {
   }
 
   const onTouchBrake = () => {
-    if (gamepadActiveRef.current) return
+    if (
+      gamepadActiveRef.current
+      || receiverCalibrationOpenRef.current
+    ) return
     let pwm = THROTTLE_NEUTRAL
     if (gearValue.current === 'D') {
       pwm = THROTTLE_NEUTRAL + BRAKE_PWM_OFFSET
@@ -530,25 +556,56 @@ function App() {
     setVideoDecoder(decoder)
   }
 
-  const setReceiverInputCenter = (channel, pulse) => {
-    if (!Number.isFinite(pulse)) return
-    const center = Math.min(
-      RECEIVER_INPUT_CENTER_MAX,
-      Math.max(RECEIVER_INPUT_CENTER_MIN, Math.round(pulse)),
-    )
-    const next = {
-      ...receiverInputCentersRef.current,
-      [channel]: center,
+  const openReceiverCalibration = useCallback(channel => {
+    receiverCalibrationOpenRef.current = true
+    receiverCalibrationRearmRef.current = false
+    gamepadActiveRef.current = false
+    socket.emit('setPulseLength', {
+      pin: 15,
+      data: THROTTLE_NEUTRAL,
+    })
+    socket.emit('setPulseLength', {
+      pin: 14,
+      data: steeringCenterRef.current,
+    })
+    setReceiverCalibrationChannel(channel)
+  }, [])
+
+  const closeReceiverCalibration = useCallback(() => {
+    receiverCalibrationOpenRef.current = false
+    receiverCalibrationRearmRef.current = true
+    setReceiverCalibrationChannel(null)
+  }, [])
+
+  const applyReceiverCalibration = useCallback(calibration => {
+    if (
+      !receiverCalibrationChannel
+      || !isReceiverCalibrationValid(calibration)
+    ) {
+      return
     }
-    receiverInputCentersRef.current = next
-    setReceiverInputCenters(next)
+
+    const next = {
+      ...receiverInputCalibrationsRef.current,
+      [receiverCalibrationChannel]: { ...calibration },
+    }
+    receiverInputCalibrationsRef.current = next
+    setReceiverInputCalibrations(next)
     window.localStorage.setItem(
-      channel === 'steering'
+      RECEIVER_CALIBRATION_STORAGE_KEY,
+      JSON.stringify({
+        version: RECEIVER_CALIBRATION_VERSION,
+        ...next,
+      }),
+    )
+    window.localStorage.setItem(
+      receiverCalibrationChannel === 'steering'
         ? RECEIVER_STEERING_CENTER_KEY
         : RECEIVER_THROTTLE_CENTER_KEY,
-      center,
+      calibration.centerPulse,
     )
-  }
+    closeReceiverCalibration()
+  }, [receiverCalibrationChannel, closeReceiverCalibration])
 
   useEffect(() => {
     let animationFrame
@@ -561,6 +618,7 @@ function App() {
     let lastGamepadId = ''
     let emergencyLatched = false
     let confirmedDisconnected = false
+    let rearmCenteredSince
 
     const updateReceiverPwm = gamepad => {
       const next = getReceiverPwmTelemetry(gamepad)
@@ -572,6 +630,7 @@ function App() {
           ? current
           : next
       ))
+      return next
     }
 
     const updateStatus = (status, id = '') => {
@@ -640,6 +699,7 @@ function App() {
     const handleUnavailableSnapshot = snapshot => {
       updateReceiverPwm(null)
       emergencyLatched = false
+      rearmCenteredSince = undefined
       neutralizeGamepad(
         unavailableStatus(snapshot),
         snapshot.id || lastGamepadId,
@@ -676,17 +736,25 @@ function App() {
       const gamepad = snapshot.gamepad
       confirmedDisconnected = false
       lastGamepadId = gamepad.id || lastGamepadId
-      updateReceiverPwm(gamepad)
+      const receiverPwm = updateReceiverPwm(gamepad)
 
       const input = getDriveGamepadInput(
         gamepad,
         {
-          receiverSteeringCenter:
-            receiverInputCentersRef.current.steering,
-          receiverThrottleCenter:
-            receiverInputCentersRef.current.throttle,
+          receiverSteeringCalibration:
+            receiverInputCalibrationsRef.current.steering,
+          receiverThrottleCalibration:
+            receiverInputCalibrationsRef.current.throttle,
         },
       )
+      if (receiverCalibrationOpenRef.current) {
+        emergencyLatched = false
+        rearmCenteredSince = undefined
+        neutralizeGamepad('calibrating', gamepad.id)
+        scheduleControlFrame(pollGamepad)
+        return
+      }
+
       const wasEmergencyLatched = emergencyLatched
       emergencyLatched = getGamepadEmergencyLatched({
         latched: emergencyLatched,
@@ -701,6 +769,34 @@ function App() {
         return
       }
       if (wasEmergencyLatched) {
+        neutralizeGamepad('connected', gamepad.id)
+        scheduleControlFrame(pollGamepad)
+        return
+      }
+
+      if (receiverCalibrationRearmRef.current) {
+        const receiverSignalAvailable = !receiverPwm.supported
+          || receiverPwm.valid
+        const centered = receiverSignalAvailable
+          && normalizeGamepadAxis(input.leftY) === 0
+          && normalizeGamepadAxis(input.rightX) === 0
+        if (!centered) {
+          rearmCenteredSince = undefined
+        } else if (rearmCenteredSince === undefined) {
+          rearmCenteredSince = timestamp
+        }
+
+        if (
+          rearmCenteredSince === undefined
+          || timestamp - rearmCenteredSince < GAMEPAD_REARM_CENTER_MS
+        ) {
+          neutralizeGamepad('rearming', gamepad.id)
+          scheduleControlFrame(pollGamepad)
+          return
+        }
+
+        receiverCalibrationRearmRef.current = false
+        rearmCenteredSince = undefined
         neutralizeGamepad('connected', gamepad.id)
         scheduleControlFrame(pollGamepad)
         return
@@ -771,6 +867,7 @@ function App() {
       monitoring = false
       cancelScheduledMonitoring()
       emergencyLatched = false
+      rearmCenteredSince = undefined
       neutralizeGamepad(
         confirmedDisconnected ? 'disconnected' : 'waiting',
         lastGamepadId,
@@ -913,36 +1010,30 @@ function App() {
                 'ReceiverPwmStatus',
                 receiverPwmState.valid ? 'valid' : 'invalid',
               ].join(' ')}
-              title="点击方向或油门当前值，将其设为遥控器输入中位"
+              title="点击方向或油门当前值，打开遥控器三点校准"
             >
               PWM · 方向&nbsp;
               <button
                 className="ReceiverPwmValue"
                 type="button"
                 disabled={receiverPwmState.steeringPulse === null}
-                onClick={() => setReceiverInputCenter(
-                  'steering',
-                  receiverPwmState.steeringPulse,
-                )}
-                title="将当前方向PWM设为遥控器输入中位"
+                onClick={() => openReceiverCalibration('steering')}
+                title="打开方向遥控器左、中、右三点校准"
               >
                 {receiverPwmState.steeringPulse ?? '--'} μs
               </button>
-              <small>中{receiverInputCenters.steering}</small>
+              <small>中{receiverInputCalibrations.steering.centerPulse}</small>
               &nbsp;· 油门&nbsp;
               <button
                 className="ReceiverPwmValue"
                 type="button"
                 disabled={receiverPwmState.throttlePulse === null}
-                onClick={() => setReceiverInputCenter(
-                  'throttle',
-                  receiverPwmState.throttlePulse,
-                )}
-                title="将当前油门PWM设为遥控器输入中位，车辆输出仍为1500μs"
+                onClick={() => openReceiverCalibration('throttle')}
+                title="打开油门遥控器前进、中位、后退三点校准"
               >
                 {receiverPwmState.throttlePulse ?? '--'} μs
               </button>
-              <small>中{receiverInputCenters.throttle}</small>
+              <small>中{receiverInputCalibrations.throttle.centerPulse}</small>
             </span>
           )}
         </div>
@@ -956,6 +1047,17 @@ function App() {
           刷新图传
         </button>
       </div>
+      <ReceiverCalibrationModal
+        channel={receiverCalibrationChannel}
+        pulse={receiverCalibrationChannel === 'steering'
+          ? receiverPwmState.steeringPulse
+          : receiverPwmState.throttlePulse}
+        value={receiverCalibrationChannel
+          ? receiverInputCalibrations[receiverCalibrationChannel]
+          : receiverInputCalibrations.steering}
+        onApply={applyReceiverCalibration}
+        onClose={closeReceiverCalibration}
+      />
       <VideoSettingsModal
         open={settingsOpen}
         value={draftSettings}
@@ -1009,7 +1111,10 @@ function App() {
         >stop</a>
         <Gear onChange={gearChange}/>
         <Direction onChange={e => {
-          if (!gamepadActiveRef.current) pwmChange(14, 100 - e)
+          if (
+            !gamepadActiveRef.current
+            && !receiverCalibrationOpenRef.current
+          ) pwmChange(14, 100 - e)
         }}/>
       </div>
       <br />

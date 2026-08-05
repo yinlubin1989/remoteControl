@@ -126,6 +126,18 @@ body,
 .GamepadStatus--connected {
     color: #acf9fb;
 }
+.GamepadStatus--calibrating {
+    color: #f7c867;
+    text-shadow: 0 0 10px rgba(247, 200, 103, 0.36);
+}
+.GamepadStatus--calibrating i {
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+    animation: gamepad-status-pulse 700ms ease-in-out infinite alternate;
+}
+.GamepadStatus--rearming {
+    color: #ffb37a;
+}
 .GamepadStatus--waiting,
 .GamepadStatus--blocked {
     color: #ffb37a;
@@ -1236,6 +1248,325 @@ body,
     top: 50%;
     border: 1px solid #acf9fb;
     position: absolute;
+}
+
+/* Receiver PWM three-point calibration */
+.ReceiverCalibrationDialog {
+    width: min(640px, 100%);
+    height: auto;
+    max-height: calc(100dvh - 36px);
+    overflow-y: auto;
+    background:
+        linear-gradient(150deg, rgba(9, 37, 45, 0.99), rgba(3, 15, 20, 0.995));
+    border-color: rgba(143, 255, 178, 0.44);
+}
+.ReceiverCalibrationHeader {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px 20px 15px;
+    border-bottom: 1px solid rgba(172, 249, 251, 0.16);
+}
+.ReceiverCalibrationHeader::after {
+    content: "";
+    position: absolute;
+    left: 20px;
+    bottom: -1px;
+    width: 112px;
+    height: 2px;
+    background: #8fffb2;
+    box-shadow: 0 0 14px rgba(143, 255, 178, 0.65);
+}
+.ReceiverCalibrationHeader > div > span {
+    display: block;
+    margin-bottom: 5px;
+    color: #8fffb2;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    letter-spacing: 0.13em;
+}
+.ReceiverCalibrationHeader h2 {
+    color: #efffff;
+    font-size: 20px;
+    letter-spacing: 0.02em;
+}
+.ReceiverCalibrationHeader p {
+    margin-top: 5px;
+    color: #71969d;
+    font-size: 10px;
+    line-height: 1.45;
+}
+.ReceiverCalibrationContent {
+    padding: 16px 20px 18px;
+}
+.ReceiverCalibrationLive {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    min-height: 82px;
+    padding: 13px 16px;
+    overflow: hidden;
+    background:
+        linear-gradient(90deg, rgba(143, 255, 178, 0.09), rgba(5, 24, 30, 0.7)),
+        repeating-linear-gradient(
+            90deg,
+            transparent 0,
+            transparent 31px,
+            rgba(172, 249, 251, 0.035) 32px
+        );
+    border: 1px solid rgba(143, 255, 178, 0.27);
+    border-radius: 5px;
+}
+.ReceiverCalibrationLive > div span,
+.ReceiverCalibrationLive > div small {
+    display: block;
+}
+.ReceiverCalibrationLive > div span {
+    color: #d9ffff;
+    font-size: 12px;
+    font-weight: 700;
+}
+.ReceiverCalibrationLive > div span i {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: #8fffb2;
+    box-shadow: 0 0 9px rgba(143, 255, 178, 0.78);
+}
+.ReceiverCalibrationLive > div small {
+    margin-top: 5px;
+    color: #71969d;
+    font-size: 9px;
+}
+.ReceiverCalibrationLive > output {
+    flex: 0 0 auto;
+    color: #8fffb2;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 32px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-shadow: 0 0 18px rgba(143, 255, 178, 0.25);
+}
+.ReceiverCalibrationLive > output small {
+    margin-left: 4px;
+    color: #71969d;
+    font-size: 11px;
+}
+.ReceiverCalibrationLive.offline {
+    border-color: rgba(255, 179, 122, 0.3);
+}
+.ReceiverCalibrationLive.offline > div span,
+.ReceiverCalibrationLive.offline > output {
+    color: #ffb37a;
+}
+.ReceiverCalibrationLive.offline > div span i {
+    background: #ffb37a;
+    box-shadow: none;
+}
+.ReceiverCalibrationPoints {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+}
+.ReceiverCalibrationPoint {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 166px;
+    flex-direction: column;
+    padding: 12px;
+    background: rgba(3, 15, 20, 0.56);
+    border: 1px solid rgba(172, 249, 251, 0.13);
+    border-radius: 5px;
+}
+.ReceiverCalibrationIndex {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: rgba(172, 249, 251, 0.24);
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 9px;
+}
+.ReceiverCalibrationPoint strong,
+.ReceiverCalibrationPoint small {
+    display: block;
+    padding-right: 22px;
+}
+.ReceiverCalibrationPoint strong {
+    color: #d9ffff;
+    font-size: 11px;
+}
+.ReceiverCalibrationPoint small {
+    min-height: 27px;
+    margin-top: 4px;
+    color: #65888e;
+    font-size: 8px;
+    line-height: 1.4;
+}
+.ReceiverCalibrationPoint output {
+    display: block;
+    margin: 12px 0 10px;
+    color: #acf9fb;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+}
+.ReceiverCalibrationPoint button {
+    appearance: none;
+    min-height: 42px;
+    margin-top: auto;
+    padding: 7px 6px;
+    color: #acf9fb;
+    background: rgba(172, 249, 251, 0.06);
+    border: 1px solid rgba(172, 249, 251, 0.32);
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background 120ms ease, color 120ms ease, transform 80ms ease;
+}
+.ReceiverCalibrationPoint button:not(:disabled):hover,
+.ReceiverCalibrationPoint button:not(:disabled):focus-visible {
+    color: #041218;
+    background: #acf9fb;
+    outline: none;
+}
+.ReceiverCalibrationPoint button:not(:disabled):active {
+    transform: translateY(1px);
+}
+.ReceiverCalibrationPoint button:disabled {
+    cursor: default;
+    opacity: 0.34;
+}
+.ReceiverCalibrationValidation {
+    min-height: 32px;
+    margin-top: 10px;
+    padding: 8px 10px;
+    font-size: 9px;
+    line-height: 1.5;
+    border-left: 2px solid currentColor;
+}
+.ReceiverCalibrationValidation.error {
+    color: #ff9f8d;
+    background: rgba(255, 128, 105, 0.07);
+}
+.ReceiverCalibrationValidation.ready {
+    color: #8fffb2;
+    background: rgba(143, 255, 178, 0.06);
+}
+.ReceiverCalibrationFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 11px 20px calc(11px + env(safe-area-inset-bottom));
+    background: rgba(3, 15, 20, 0.88);
+    border-top: 1px solid rgba(172, 249, 251, 0.16);
+}
+.ReceiverCalibrationFooter p {
+    max-width: 340px;
+    color: #65888e;
+    font-size: 8px;
+    line-height: 1.45;
+}
+.ReceiverCalibrationFooter > div {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 7px;
+}
+.ReceiverCalibrationFooter button {
+    appearance: none;
+    min-height: 40px;
+    padding: 8px 12px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.ReceiverCalibrationFooter .SettingsApply:disabled {
+    color: #58747a;
+    background: #122a30;
+    border-color: #18383f;
+    box-shadow: none;
+    cursor: default;
+}
+
+@media (max-width: 600px) {
+    .ReceiverCalibrationDialog {
+        width: 100%;
+        max-height: calc(100dvh - max(8px, env(safe-area-inset-top)));
+        border-right: 0;
+        border-bottom: 0;
+        border-left: 0;
+        border-radius: 12px 12px 0 0;
+    }
+    .ReceiverCalibrationHeader {
+        padding: 14px 15px 12px;
+    }
+    .ReceiverCalibrationHeader::after {
+        left: 15px;
+    }
+    .ReceiverCalibrationHeader h2 {
+        font-size: 17px;
+    }
+    .ReceiverCalibrationContent {
+        padding: 12px 14px 14px;
+    }
+    .ReceiverCalibrationLive {
+        min-height: 68px;
+        padding: 10px 12px;
+    }
+    .ReceiverCalibrationLive > div small {
+        max-width: 190px;
+    }
+    .ReceiverCalibrationLive > output {
+        font-size: 26px;
+    }
+    .ReceiverCalibrationPoints {
+        gap: 5px;
+    }
+    .ReceiverCalibrationPoint {
+        min-height: 154px;
+        padding: 9px 7px;
+    }
+    .ReceiverCalibrationIndex {
+        top: 7px;
+        right: 7px;
+    }
+    .ReceiverCalibrationPoint strong,
+    .ReceiverCalibrationPoint small {
+        padding-right: 14px;
+    }
+    .ReceiverCalibrationPoint output {
+        font-size: 11px;
+    }
+    .ReceiverCalibrationPoint button {
+        min-height: 44px;
+        font-size: 9px;
+    }
+    .ReceiverCalibrationFooter {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 8px;
+        padding: 9px 14px calc(9px + env(safe-area-inset-bottom));
+    }
+    .ReceiverCalibrationFooter p {
+        max-width: none;
+    }
+    .ReceiverCalibrationFooter > div {
+        width: 100%;
+    }
+    .ReceiverCalibrationFooter button {
+        flex: 1;
+        min-height: 44px;
+    }
 }
 /* .App {
     opacity: 0.1;

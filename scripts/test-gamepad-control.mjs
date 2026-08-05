@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict'
 import {
+  createReceiverCalibrationFromCenter,
+  DEFAULT_RECEIVER_CALIBRATION,
   decodeReceiverPwmAxis,
   getDriveGamepadInput,
   getGamepadEmergencyLatched,
   getGamepadDriveOutput,
+  getReceiverCalibrationError,
   getReceiverPwmTelemetry,
   isDriveGamepad,
   isDriveGamepadIdentity,
+  isReceiverCalibrationValid,
+  mapReceiverPwmToGamepadAxis,
   normalizeGamepadAxis,
+  parseReceiverCalibrationSettings,
   readGamepadSnapshot,
 } from '../src/gamepadControl.js'
 
@@ -117,6 +123,16 @@ assert.deepEqual(receiverDriveInput, {
   rightX: -1,
   emergencyPressed: false,
 })
+assert.deepEqual(
+  getGamepadDriveOutput(receiverDriveInput),
+  {
+    active: true,
+    steeringAxis: -1,
+    throttleAxis: 1,
+    steeringPulse: 2500,
+    throttlePulse: 2000,
+  },
+)
 assert.deepEqual(getDriveGamepadInput({
   id: 'RC Car Controller',
   axes: [toBrowserAxis(16000), 0.8, -0.8, toBrowserAxis(16000)],
@@ -140,8 +156,16 @@ const calibratedReceiverInput = getDriveGamepadInput({
   axes: [toBrowserAxis(13990), 0.8, -0.8, toBrowserAxis(17635)],
   buttons: [],
 }, {
-  receiverSteeringCenter: 1366,
-  receiverThrottleCenter: 1609,
+  receiverSteeringCalibration: {
+    negativePulse: 866,
+    centerPulse: 1366,
+    positivePulse: 1866,
+  },
+  receiverThrottleCalibration: {
+    negativePulse: 1109,
+    centerPulse: 1609,
+    positivePulse: 2109,
+  },
 })
 assert.deepEqual(calibratedReceiverInput, {
   leftY: 0,
@@ -159,18 +183,37 @@ assert.deepEqual(
   ],
   [1620, 1500],
 )
-assert.deepEqual(getDriveGamepadInput({
+const calibratedReceiverEndpointInput = getDriveGamepadInput({
   id: 'RC Car Controller',
   axes: [toBrowserAxis(21490), 0, 0, toBrowserAxis(10135)],
   buttons: [],
 }, {
-  receiverSteeringCenter: 1366,
-  receiverThrottleCenter: 1609,
-}), {
+  receiverSteeringCalibration: {
+    negativePulse: 866,
+    centerPulse: 1366,
+    positivePulse: 1866,
+  },
+  receiverThrottleCalibration: {
+    negativePulse: 1109,
+    centerPulse: 1609,
+    positivePulse: 2109,
+  },
+})
+assert.deepEqual(calibratedReceiverEndpointInput, {
   leftY: -1,
   rightX: 1,
   emergencyPressed: false,
 })
+assert.deepEqual(
+  getGamepadDriveOutput(calibratedReceiverEndpointInput),
+  {
+    active: true,
+    steeringAxis: 1,
+    throttleAxis: -1,
+    steeringPulse: 500,
+    throttlePulse: 1000,
+  },
+)
 
 assert.equal(decodeReceiverPwmAxis(-1), null)
 assert.equal(decodeReceiverPwmAxis(0), null)
@@ -199,6 +242,117 @@ assert.equal(getReceiverPwmTelemetry({
   id: 'Xbox Wireless Controller',
   axes: [0, 0, 0, 0],
 }).supported, false)
+
+assert.equal(isReceiverCalibrationValid(DEFAULT_RECEIVER_CALIBRATION), true)
+assert.equal(
+  mapReceiverPwmToGamepadAxis(1000, DEFAULT_RECEIVER_CALIBRATION),
+  -1,
+)
+assert.equal(
+  mapReceiverPwmToGamepadAxis(1500, DEFAULT_RECEIVER_CALIBRATION),
+  0,
+)
+assert.equal(
+  mapReceiverPwmToGamepadAxis(2000, DEFAULT_RECEIVER_CALIBRATION),
+  1,
+)
+assert.equal(
+  mapReceiverPwmToGamepadAxis(700, DEFAULT_RECEIVER_CALIBRATION),
+  -1,
+)
+assert.equal(
+  mapReceiverPwmToGamepadAxis(2300, DEFAULT_RECEIVER_CALIBRATION),
+  1,
+)
+
+const asymmetricCalibration = {
+  negativePulse: 900,
+  centerPulse: 1490,
+  positivePulse: 2070,
+}
+assert.equal(
+  mapReceiverPwmToGamepadAxis(1195, asymmetricCalibration),
+  -0.5,
+)
+assert.equal(
+  mapReceiverPwmToGamepadAxis(1780, asymmetricCalibration),
+  0.5,
+)
+
+const reversedCalibration = {
+  negativePulse: 2000,
+  centerPulse: 1500,
+  positivePulse: 1000,
+}
+assert.equal(isReceiverCalibrationValid(reversedCalibration), true)
+assert.equal(mapReceiverPwmToGamepadAxis(2000, reversedCalibration), -1)
+assert.equal(mapReceiverPwmToGamepadAxis(1750, reversedCalibration), -0.5)
+assert.equal(mapReceiverPwmToGamepadAxis(1000, reversedCalibration), 1)
+assert.equal(mapReceiverPwmToGamepadAxis(1250, reversedCalibration), 0.5)
+
+const sameSideCalibration = {
+  negativePulse: 1800,
+  centerPulse: 1500,
+  positivePulse: 2100,
+}
+assert.equal(isReceiverCalibrationValid(sameSideCalibration), false)
+assert.match(getReceiverCalibrationError(sameSideCalibration), /中位两侧/)
+assert.equal(mapReceiverPwmToGamepadAxis(1800, sameSideCalibration), 0)
+assert.match(getReceiverCalibrationError({
+  negativePulse: 1400,
+  centerPulse: 1500,
+  positivePulse: 2000,
+}), /150/)
+assert.match(getReceiverCalibrationError({
+  negativePulse: 400,
+  centerPulse: 1500,
+  positivePulse: 2000,
+}), /500–2500/)
+assert.match(getReceiverCalibrationError({
+  negativePulse: null,
+  centerPulse: 1500,
+  positivePulse: 2000,
+}), /三个位置/)
+
+assert.deepEqual(createReceiverCalibrationFromCenter(1366), {
+  negativePulse: 866,
+  centerPulse: 1366,
+  positivePulse: 1866,
+})
+assert.deepEqual(
+  createReceiverCalibrationFromCenter(500),
+  DEFAULT_RECEIVER_CALIBRATION,
+)
+assert.deepEqual(parseReceiverCalibrationSettings(null, {
+  steering: '1366',
+  throttle: '1609',
+}), {
+  steering: {
+    negativePulse: 866,
+    centerPulse: 1366,
+    positivePulse: 1866,
+  },
+  throttle: {
+    negativePulse: 1109,
+    centerPulse: 1609,
+    positivePulse: 2109,
+  },
+})
+assert.deepEqual(parseReceiverCalibrationSettings(JSON.stringify({
+  version: 1,
+  steering: reversedCalibration,
+  throttle: asymmetricCalibration,
+})), {
+  steering: reversedCalibration,
+  throttle: asymmetricCalibration,
+})
+assert.deepEqual(
+  parseReceiverCalibrationSettings('{bad json'),
+  {
+    steering: DEFAULT_RECEIVER_CALIBRATION,
+    throttle: DEFAULT_RECEIVER_CALIBRATION,
+  },
+)
 assert.equal(getGamepadEmergencyLatched({
   emergencyPressed: true,
   leftY: -1,
